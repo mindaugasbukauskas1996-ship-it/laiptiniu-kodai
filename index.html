@@ -30,6 +30,9 @@
   min-width:120px;
   text-align:center;
 }
+
+#weather{margin-top:20px}
+#weather b{font-weight:700}
 </style>
 </head>
 <body>
@@ -4488,7 +4491,53 @@ Klaipėda;Aguonų g.;4;1;
   entries = loadEntries();
   setAdminUI(isAdmin());
   afterLoad();
+
+// ---- WEATHER (Klaipėda) ----
+async function loadWeather(){
+  try{
+    const lat = 55.7033;
+    const lon = 21.1443;
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true&timezone=auto`;
+    const res = await fetch(url);
+    const data = await res.json();
+    const w = data.current_weather;
+    if (!w) throw new Error("No weather");
+
+    const codeMap = {
+      0: "Giedra",
+      1: "Daugiausia giedra",
+      2: "Debesuota",
+      3: "Apsiniaukę",
+      45: "Rūkas",
+      48: "Rūkas",
+      51: "Silpna dulksna",
+      61: "Lietus",
+      63: "Vidutinis lietus",
+      65: "Stiprus lietus",
+      71: "Sniegas",
+      80: "Trumpi lietūs"
+    };
+
+    const desc = codeMap[w.weathercode] || "Oro sąlygos";
+    document.getElementById("weatherContent").innerHTML = `
+      <b>${desc}</b><br>
+      🌡️ ${w.temperature} °C<br>
+      🌬️ Vėjas: ${w.windspeed} km/h<br>
+      🕒 Atnaujinta: ${w.time.replace("T"," ")}
+    `;
+  }catch(e){
+    document.getElementById("weatherContent").textContent = "Nepavyko gauti orų duomenų.";
+  }
+}
+loadWeather();
+
 </script>
+
+
+<div class="card" id="weather">
+  <div class="small muted">Šiandienos orai – Klaipėda</div>
+  <div id="weatherContent" class="small">Kraunama...</div>
+</div>
 
 </body>
 </html>
