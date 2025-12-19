@@ -15,11 +15,30 @@
     .code{font-size:24px;font-weight:800;letter-spacing:0.5px}
     .muted{color:#888}
     .warn{color:#b00020;font-weight:700}
+    .topbar{display:flex;gap:10px;align-items:center;justify-content:space-between}
+    .topbar .left{display:flex;gap:10px;align-items:center}
+    .btn{width:auto;white-space:nowrap}
+    .adminOnly{display:none}
+    .adminOn .adminOnly{display:block}
+    .adminRow{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;margin-top:10px}
+    .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+    .hr{height:1px;background:#eee;margin:12px 0}
+    .tag{display:inline-block;padding:4px 8px;border-radius:999px;background:#f5f5f5;font-size:12px;color:#444}
   </style>
 </head>
 <body>
 
-<h2>Laiptinių durų kodai</h2>
+<div class="topbar">
+  <div>
+    <h2 style="margin:0">Laiptinių durų kodai</h2>
+    <div class="small muted">Miestas → Gatvė → Namas → Laiptinės kodai</div>
+  </div>
+  <div class="left">
+    <button id="adminBtn" class="btn" type="button">Admin</button>
+    <button id="logoutBtn" class="btn adminOnly" type="button">Atsijungti</button>
+  </div>
+</div>
 
 <div class="card" id="filters" style="display:none">
   <label>Miestas / gyvenvietė</label>
@@ -34,16 +53,42 @@
   <select id="house"></select>
 
   <div class="small muted" id="countInfo"></div>
+
+  <div class="adminOnly" style="margin-top:10px">
+    <div class="hr"></div>
+    <div class="small"><span class="tag">Admin</span> Pakeitimai saugomi tik šiame įrenginyje (LocalStorage).</div>
+    <div class="adminRow">
+      <button id="exportBtn" type="button">Eksportuoti pakeitimus (JSON)</button>
+      <input id="importFile" type="file" accept="application/json,.json" />
+    </div>
+    <button id="resetLocalBtn" type="button" style="margin-top:10px">Išvalyti vietinius pakeitimus</button>
+  </div>
 </div>
 
 <div class="card" id="result" style="display:none">
   <div id="resultTitle" class="small muted"></div>
   <div id="stairs"></div>
   <div id="noCode" class="warn" style="display:none">Šiam namui įrašų nerasta.</div>
+
+  <div class="adminOnly" id="addBox" style="margin-top:12px">
+    <div class="hr"></div>
+    <div class="small"><span class="tag">Admin</span> Pridėti naują įrašą</div>
+    <div class="grid2" style="margin-top:10px">
+      <input id="addCity" placeholder="Miestas / gyvenvietė" />
+      <input id="addStreet" placeholder="Gatvė" />
+    </div>
+    <div class="grid3" style="margin-top:10px">
+      <input id="addHouse" placeholder="Namo nr." />
+      <input id="addStair" placeholder="Laiptinė (pvz. 1)" />
+      <input id="addCode" placeholder="Kodas (pvz. 1234 / raktas / Nėra)" />
+    </div>
+    <button id="addBtn" type="button" style="margin-top:10px">Pridėti</button>
+    <div id="addMsg" class="small" style="margin-top:8px"></div>
+  </div>
 </div>
 
 <script>
-  // Embedded CSV data (from your codes.csv)
+  // Embedded CSV data
   const EMBEDDED_CSV = `﻿Miestas;Gatvė;Namo nr. ;Laiptinė;Kodas
 Klaipėda;Žvejų g.;19;1;raktas
 Klaipėda;Žvejų g.;19;2;
@@ -4076,7 +4121,14 @@ Klaipėda;Aguonų g.;6;1;
 Klaipėda;Aguonų g.;4;1;
 `;
 
-  // Data shape: { city, street, house, stair, code }
+  // NOTE: Client-side "admin" is convenience only (not real security).
+  // Set your password here (plain). Anyone who can view source can eventually bypass it.
+  const ADMIN_PASSWORD = "4321"; // <-- PASIKEISK
+
+  const STORAGE_KEY = "doorcodes_entries_v1";
+  const ADMIN_SESSION_KEY = "doorcodes_is_admin_v1";
+
+  // Data: { city, street, house, stair, code }
   let entries = [];
   let streetAll = [];
   let houseAll = [];
@@ -4085,24 +4137,18 @@ Klaipėda;Aguonų g.;4;1;
 
   function normalize(s){
     return String(s ?? "")
-      .replace(/\ufeff/g, "")     // BOM
-      .replace(/\u00A0/g, " ")    // NBSP
+      .replace(/\ufeff/g, "")
+      .replace(/\u00A0/g, " ")
       .replace(/\s+/g, " ")
       .trim();
   }
 
-  // Tolerant CSV parser: supports ; or , delimiter. Assumes no quoted delimiters inside fields.
   function parseCSV(text){
     const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
     if (!lines.length) return [];
-
-    // detect delimiter
     const sample = lines[0];
     const delim = (sample.split(";").length >= sample.split(",").length) ? ";" : ",";
-
     const rows = lines.map(line => line.split(delim).map(v => normalize(v)));
-
-    // drop header if present
     const header = rows[0].join("|").toLowerCase();
     const hasHeader = header.includes("miestas") && header.includes("gatv");
     const dataRows = hasHeader ? rows.slice(1) : rows;
@@ -4119,14 +4165,42 @@ Klaipėda;Aguonų g.;4;1;
       .filter(x => x.city && x.street && x.house && x.stair);
   }
 
+  function loadEntries(){
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved){
+      try{
+        const arr = JSON.parse(saved);
+        if (Array.isArray(arr) && arr.length) return arr.map(x => ({
+          city: normalize(x.city),
+          street: normalize(x.street),
+          house: normalize(x.house),
+          stair: normalize(x.stair),
+          code: normalize(x.code)
+        })).filter(x => x.city && x.street && x.house && x.stair);
+      }catch{}
+    }
+    return parseCSV(EMBEDDED_CSV);
+  }
+
+  function saveEntries(){
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
+  }
+
+  function setAdminUI(isAdmin){
+    document.body.classList.toggle("adminOn", isAdmin);
+    sessionStorage.setItem(ADMIN_SESSION_KEY, isAdmin ? "1" : "0");
+  }
+
+  function isAdmin(){
+    return sessionStorage.getItem(ADMIN_SESSION_KEY) === "1";
+  }
+
   function fillSelect(selectEl, options, placeholder){
     selectEl.innerHTML = "";
-
     const ph = document.createElement("option");
     ph.value = "";
     ph.textContent = placeholder;
     selectEl.appendChild(ph);
-
     for (const opt of options){
       const o = document.createElement("option");
       o.value = opt;
@@ -4157,14 +4231,9 @@ Klaipėda;Aguonų g.;4;1;
   function refreshCities(){
     const priority = ["Klaipėda", "Šilutė", "Tauragė", "Šilalė"];
     const all = [...new Set(entries.map(e => e.city))];
-
     const top = priority.filter(p => all.includes(p));
-    const rest = all
-      .filter(c => !priority.includes(c))
-      .sort((a,b)=>a.localeCompare(b,"lt"));
-
-    const cities = [...top, ...rest];
-    fillSelect(el("city"), cities, "Pasirink miestą...");
+    const rest = all.filter(c => !priority.includes(c)).sort((a,b)=>a.localeCompare(b,"lt"));
+    fillSelect(el("city"), [...top, ...rest], "Pasirink miestą...");
   }
 
   function refreshStreets(){
@@ -4183,9 +4252,7 @@ Klaipėda;Aguonų g.;4;1;
   function refreshHouses(){
     const city = el("city").value;
     const street = el("street").value;
-    const list = entries
-      .filter(e => e.city === city && e.street === street)
-      .map(e => e.house);
+    const list = entries.filter(e => e.city === city && e.street === street).map(e => e.house);
     houseAll = [...new Set(list)].sort((a,b)=>a.localeCompare(b,"lt",{numeric:true}));
     applyHouseFilter();
   }
@@ -4196,14 +4263,29 @@ Klaipėda;Aguonų g.;4;1;
     fillSelect(el("house"), filtered, "Pasirink namą...");
   }
 
+  function upsertEntry(newE){
+    const key = (e)=> `${e.city}||${e.street}||${e.house}||${e.stair}`.toLowerCase();
+    const k = key(newE);
+    const idx = entries.findIndex(e => key(e) === k);
+    if (idx >= 0) entries[idx] = newE;
+    else entries.push(newE);
+    saveEntries();
+  }
+
   function showResult(){
     const city = el("city").value;
     const street = el("street").value;
     const house = el("house").value;
 
     const matches = entries
-      .filter(e => e.city === city && e.street === street && e.house === house)
-      .sort((a,b)=>String(a.stair).localeCompare(String(b.stair), "lt", {numeric:true}));
+  .filter(e =>
+    e.city === city &&
+    e.street === street &&
+    e.house === house &&
+    e.code &&
+    e.code.toLowerCase() !== "nėra"
+  )
+  .sort((a,b)=>String(a.stair).localeCompare(String(b.stair), "lt", {numeric:true}));
 
     el("resultTitle").textContent = `${city} • ${street} ${house}`;
     el("stairs").innerHTML = "";
@@ -4235,11 +4317,42 @@ Klaipėda;Aguonų g.;4;1;
 
       wrap.appendChild(left);
       wrap.appendChild(btn);
+
+      if (isAdmin()){
+        const editBox = document.createElement("div");
+        editBox.style.marginTop = "8px";
+        const safeVal = (m.code ?? "").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;");
+        editBox.innerHTML = `
+          <div class="small"><span class="tag">Admin</span> Redaguoti kodą</div>
+          <div class="adminRow">
+            <input value="${safeVal}" placeholder="Kodas" />
+            <button type="button">Saugoti</button>
+          </div>
+        `;
+        const input = editBox.querySelector("input");
+        const saveBtn = editBox.querySelector("button");
+        saveBtn.onclick = () => {
+          const updated = { city:m.city, street:m.street, house:m.house, stair:m.stair, code: normalize(input.value) };
+          upsertEntry(updated);
+          showResult();
+        };
+        wrap.appendChild(editBox);
+      }
+
       el("stairs").appendChild(wrap);
     }
 
     el("countInfo").textContent = `Įrašų: ${entries.length}`;
     el("result").style.display = "block";
+
+    if (isAdmin()){
+      el("addCity").value = city || "";
+      el("addStreet").value = street || "";
+      el("addHouse").value = house || "";
+      el("addStair").value = "";
+      el("addCode").value = "";
+      el("addMsg").textContent = "";
+    }
   }
 
   function afterLoad(){
@@ -4250,11 +4363,93 @@ Klaipėda;Aguonų g.;4;1;
     el("countInfo").textContent = `Įrašų: ${entries.length}`;
   }
 
-  // Auto-load on open
-  entries = parseCSV(EMBEDDED_CSV);
-  afterLoad();
+  el("adminBtn").addEventListener("click", () => {
+    if (isAdmin()){
+      alert("Admin režimas jau įjungtas.");
+      return;
+    }
+    const pw = prompt("Įvesk admin slaptažodį:");
+    if (pw === null) return;
+    if (pw === ADMIN_PASSWORD){
+      setAdminUI(true);
+      if (el("house").value) showResult();
+      alert("Admin režimas įjungtas.");
+    }else{
+      alert("Neteisingas slaptažodis.");
+    }
+  });
 
-  // Events
+  el("logoutBtn").addEventListener("click", () => {
+    setAdminUI(false);
+    if (el("house").value) showResult();
+  });
+
+  el("exportBtn").addEventListener("click", () => {
+    const blob = new Blob([JSON.stringify(entries, null, 2)], {type:"application/json"});
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "laiptiniu-kodai.json";
+    a.click();
+    URL.revokeObjectURL(a.href);
+  });
+
+  el("importFile").addEventListener("change", async (ev) => {
+    const f = ev.target.files?.[0];
+    if (!f) return;
+    try{
+      const text = await f.text();
+      const arr = JSON.parse(text);
+      if (!Array.isArray(arr)) throw new Error("Blogas formatas");
+      entries = arr.map(x => ({
+        city: normalize(x.city),
+        street: normalize(x.street),
+        house: normalize(x.house),
+        stair: normalize(x.stair),
+        code: normalize(x.code)
+      })).filter(x => x.city && x.street && x.house && x.stair);
+      saveEntries();
+      afterLoad();
+      if (el("house").value) showResult();
+      alert("Importuota.");
+    }catch(e){
+      alert("Nepavyko importuoti JSON.");
+    }finally{
+      ev.target.value = "";
+    }
+  });
+
+  el("resetLocalBtn").addEventListener("click", () => {
+    if (!confirm("Išvalyti vietinius pakeitimus šiame įrenginyje?")) return;
+    localStorage.removeItem(STORAGE_KEY);
+    entries = loadEntries();
+    afterLoad();
+    if (el("house").value) showResult();
+  });
+
+  el("addBtn").addEventListener("click", () => {
+    const city = normalize(el("addCity").value);
+    const street = normalize(el("addStreet").value);
+    const house = normalize(el("addHouse").value);
+    const stair = normalize(el("addStair").value);
+    const code = normalize(el("addCode").value);
+
+    if (!city || !street || !house || !stair){
+      el("addMsg").innerHTML = "<span class='warn'>Užpildyk miestą, gatvę, namą ir laiptinę.</span>";
+      return;
+    }
+
+    upsertEntry({city, street, house, stair, code});
+    el("addMsg").textContent = "Išsaugota.";
+    afterLoad();
+
+    el("city").value = city;
+    refreshStreets();
+    el("street").value = street;
+    refreshHouses();
+    el("house").value = house;
+    showResult();
+  });
+
   el("city").addEventListener("change", () => {
     resetDownstream("city");
     if (!el("city").value) return;
@@ -4282,6 +4477,11 @@ Klaipėda;Aguonų g.;4;1;
     if (!el("house").value) return;
     showResult();
   });
+
+  // Init
+  entries = loadEntries();
+  setAdminUI(isAdmin());
+  afterLoad();
 </script>
 
 </body>
