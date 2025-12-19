@@ -1,0 +1,4288 @@
+<!doctype html>
+<html lang="lt">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Laiptinių kodai</title>
+  <style>
+    body{font-family:system-ui,Segoe UI,Roboto,Arial,sans-serif;margin:16px;line-height:1.25}
+    .card{border:1px solid #ddd;border-radius:14px;padding:14px;margin:12px 0}
+    label{display:block;margin:10px 0 6px;font-weight:600}
+    select,input,button{width:100%;padding:12px;border-radius:12px;border:1px solid #ccc;font-size:16px}
+    button{cursor:pointer}
+    .small{font-size:13px;color:#666}
+    .pill{display:flex;gap:10px;align-items:center;justify-content:space-between;padding:12px;border:1px solid #eee;border-radius:12px;margin:10px 0}
+    .code{font-size:24px;font-weight:800;letter-spacing:0.5px}
+    .muted{color:#888}
+    .warn{color:#b00020;font-weight:700}
+  </style>
+</head>
+<body>
+
+<h2>Laiptinių durų kodai</h2>
+
+<div class="card" id="filters" style="display:none">
+  <label>Miestas / gyvenvietė</label>
+  <select id="city"></select>
+
+  <label>Gatvė</label>
+  <input id="streetSearch" placeholder="Ieškoti gatvės..." />
+  <select id="street"></select>
+
+  <label>Namas</label>
+  <input id="houseSearch" placeholder="Ieškoti namo..." />
+  <select id="house"></select>
+
+  <div class="small muted" id="countInfo"></div>
+</div>
+
+<div class="card" id="result" style="display:none">
+  <div id="resultTitle" class="small muted"></div>
+  <div id="stairs"></div>
+  <div id="noCode" class="warn" style="display:none">Šiam namui įrašų nerasta.</div>
+</div>
+
+<script>
+  // Embedded CSV data (from your codes.csv)
+  const EMBEDDED_CSV = `﻿Miestas;Gatvė;Namo nr. ;Laiptinė;Kodas
+Klaipėda;Žvejų g.;19;1;raktas
+Klaipėda;Žvejų g.;19;2;
+Klaipėda;Žvejų g.;17;1;
+Klaipėda;Žvejų g.;17;2;
+Klaipėda;Žvejų g.;15;1;38
+Klaipėda;Žvejų g.;13;1;7*3969
+Klaipėda;Žvejų g.;13;2;
+Klaipėda;Žvejų g.;11;1;
+Klaipėda;Žvejų g.;9;1;200*1234
+Klaipėda;Žvejų g.;9;2;
+Klaipėda;Žvejų g.;7;2;
+Klaipėda;Žvejų g.;7;1;raktas
+Drevernos k.;Žvejų g.;4;1;
+Klaipėda;Žvejų g.;1;3;Nėra
+Klaipėda;Žvejų g.;1;2;Nėra
+Klaipėda;Žvejų g.;1;1;100*1991
+Klaipėda;Žvejų g.;1;4;Nėra
+Šilutė;Žuvų g.;7;1;
+Šilutė;Žuvų g.;3;1;
+Šilutė;Žuvų g.;2;1;
+Šilutė;Žuvų g.;1;1;
+Natkiškių k.;Zosės Petraitienės g.;19;1;
+Natkiškių k.;Zosės Petraitienės g.;15;1;
+Natkiškių k.;Zosės Petraitienės g.;13;1;
+Natkiškių k.;Zosės Petraitienės g.;11;1;
+Natkiškių k.;Zosės Petraitienės g.;8;1;
+Natkiškių k.;Zosės Petraitienės g.;6;1;
+Natkiškių k.;Zosės Petraitienės g.;5;1;
+Natkiškių k.;Zosės Petraitienės g.;3;1;
+Klaipėda;Žolynų g.;37;2;Pultas pas KA, sig kodas 1335
+Klaipėda;Žolynų g.;37;1;2*2035
+Sakūtėlių k.;Žolynų g.;11;1;
+Kintai;Žirmūnų g.;5;1;
+Kintai;Žirmūnų g.;3;1;Nėra
+Kintai;Žirmūnų g.;1;2;0
+Kintai;Žirmūnų g.;1;1;0
+Palanga;Žiogų g.;6;1;05*7059
+Juodainiai;Žibintų g.;6;1;
+Vìlkyčių k.;Žibinto g.;4;1;
+Vìlkyčių k.;Žibinto g.;4;2;
+Šilalė;Žemaitės g.;10;1;
+Šilalė;Žemaitės g.;8;1;nėra
+Šilalė;Žemaitės g.;8;2;nėra
+Šilalė;Žemaitės g.;8;3;nėra
+Šilalė;Žemaitės g.;6;1;12
+Šilalė;Žemaitės g.;6;2;38
+Šilalė;Žemaitės g.;4;3;
+Šilalė;Žemaitės g.;4;2;
+Šilalė;Žemaitės g.;4;1;
+Šilalė;Žemaitės g.;4;4;
+Tauragė;Žemaitės g.;3;1;29
+Tauragė;Žemaitės g.;3;2;38
+Šilutė;Žemaičių Naumiesčio g.;1;1;
+Pagėgiai;Žemaičių g.;49;1;
+Pagėgiai;Žemaičių g.;45;1;
+Pagėgiai;Žemaičių g.;41;1;
+Pagėgiai;Žemaičių g.;39;1;
+Pagėgiai;Žemaičių g.;37;1;
+Pagėgiai;Žemaičių g.;16;1;
+Pagėgiai;Žemaičių g.;13;1;
+Drevernos k.;Žemaičių g.;9;1;
+Palanga;Žemaičių g.;5G;4;
+Palanga;Žemaičių g.;5G;7;
+Palanga;Žemaičių g.;5G;9;
+Palanga;Žemaičių g.;5G;2;
+Palanga;Žemaičių g.;5G;3;
+Palanga;Žemaičių g.;5G;5;
+Palanga;Žemaičių g.;5G;1;01*2132
+Palanga;Žemaičių g.;5G;6;
+Palanga;Žemaičių g.;5G;8;
+Šilutė;Žemaičių g.;5;1;
+Šilutė;Žemaičių g.;5;2;
+Šilutė;Žemaičių g.;4a;1;
+Šilutė;Žemaičių g.;4;1;
+Pagėgiai;Žemaičių g.;3;1;
+Pagėgiai;Žemaičių g.;1A;1;
+Klaipėda;Žardininkų g.;23;2;
+Klaipėda;Žardininkų g.;23;1;119*1919
+Klaipėda;Žardininkų g.;21;2;119*1919
+Klaipėda;Žardininkų g.;21;1;119*1919
+Klaipėda;Žardininkų g.;21;3;119*1919
+Klaipėda;Žardininkų g.;21;4;119*1919
+Klaipėda;Žardininkų g.;17;1;193*4611
+Klaipėda;Žardininkų g.;17;3;238
+Klaipėda;Žardininkų g.;17;4;193*4611
+Klaipėda;Žardininkų g.;17;2;193*4611
+Klaipėda;Žardininkų g.;16;2;155*4811
+Klaipėda;Žardininkų g.;16;3;155*4811
+Klaipėda;Žardininkų g.;16;1;155*4811
+Klaipėda;Žardininkų g.;16;4;155*4811
+Klaipėda;Žardininkų g.;15;1;190*3735
+Klaipėda;Žardininkų g.;15;2;190*3735
+Klaipėda;Žardininkų g.;14;1;147*5537
+Klaipėda;Žardininkų g.;13;2;190*3735
+Klaipėda;Žardininkų g.;13;1;190*3735
+Klaipėda;Žardininkų g.;12;3;190*3735
+Klaipėda;Žardininkų g.;12;1;190*3735
+Klaipėda;Žardininkų g.;12;2;190*3735
+Klaipėda;Žardininkų g.;11;3;191*4822
+Klaipėda;Žardininkų g.;11;2;191/4822
+Klaipėda;Žardininkų g.;11;1;191*4822
+Klaipėda;Žardininkų g.;11;4;191*4822
+Klaipėda;Žardininkų g.;9;3;191*4822
+Klaipėda;Žardininkų g.;9;2;191*4822
+Klaipėda;Žardininkų g.;9;1;78
+Klaipėda;Žardininkų g.;9;4;191*4822
+Klaipėda;Žardininkų g.;8;5;
+Klaipėda;Žardininkų g.;8;3;191*4822
+Klaipėda;Žardininkų g.;8;4;38, 191*4822
+Klaipėda;Žardininkų g.;8;1;191*4822
+Klaipėda;Žardininkų g.;8;2;191*4822
+Klaipėda;Žardininkų g.;7;1;170*3232
+Klaipėda;Žardininkų g.;7;2;170*3232
+Klaipėda;Žardininkų g.;5;1;200*4088
+Klaipėda;Žardininkų g.;5;2;200*4088
+Klaipėda;Žardininkų g.;4;2;149*4431
+Klaipėda;Žardininkų g.;4;3;149*4431
+Klaipėda;Žardininkų g.;4;1;149*4431
+Klaipėda;Žardininkų g.;3;1;150*5689
+Klaipėda;Žardininkų g.;2;1;144*7915
+Klaipėda;Žardininkų g.;1;1;115*6173
+Klaipėda;Žardininkų g.;1;2;115*6173
+Klaipėda;Žardininkų g.;1;5;
+Klaipėda;Žardininkų g.;1;3;115*6173
+Klaipėda;Žardininkų g.;1;4;115*6173
+Armalėnų k.;Žalioji g.;14;1;
+Kvėdarna;Žalioji g.;7;1;
+Kvėdarna;Žalioji g.;6;2;5486#
+Kvėdarna;Žalioji g.;6;3;5486#
+Kvėdarna;Žalioji g.;6;1;5486#
+Kvėdarna;Žalioji g.;5;1;
+Kvėdarna;Žalioji g.;5;2;
+Kvėdarna;Žalioji g.;5;4;
+Kvėdarna;Žalioji g.;5;3;
+Kvėdarna;Žalioji g.;3;3;
+Kvėdarna;Žalioji g.;3;1;
+Kvėdarna;Žalioji g.;3;2;38
+Rukų k.;Žalioji g.;2;1;
+Kvėdarna;Žalioji g.;2;2;
+Kvėdarna;Žalioji g.;2;1;
+Kvėdarna;Žalioji g.;2;3;38
+Kvėdarna;Žalioji g.;1A;1;
+Kvėdarna;Žalioji g.;1;2;
+Kvėdarna;Žalioji g.;1;1;nėra
+Kvėdarna;Žalioji g.;1;3;nėra
+Neringa;Žaliasis kel.;4;2;
+Neringa;Žaliasis kel.;4;2;
+Neringa;Žaliasis kel.;4;1;
+Neringa;Žaliasis kel.;4;1;
+Klaipėda;Žalgirio g.;15;2;191*6885
+Klaipėda;Žalgirio g.;15;1;191*6885
+Šilutė;Žalgirio g.;13;2;56
+Šilutė;Žalgirio g.;13;1;38
+Klaipėda;Žalgirio g.;13;1;540
+Klaipėda;Žalgirio g.;13;3;191*6885
+Klaipėda;Žalgirio g.;13;2;191*6885
+Šilutė;Žalgirio g.;11;2;38
+Šilutė;Žalgirio g.;11;3;38
+Šilutė;Žalgirio g.;11;1;38
+Klaipėda;Žalgirio g.;11;2;150*5689
+Klaipėda;Žalgirio g.;11;1;150*5689
+Klaipėda;Žalgirio g.;9;1;150*5689
+Klaipėda;Žalgirio g.;9;2;157
+Šilutė;Žalgirio g.;8;1;
+Šilutė;Žalgirio g.;7;1;
+Klaipėda;Žalgirio g.;7;2;191*6885
+Klaipėda;Žalgirio g.;7;3;256
+Klaipėda;Žalgirio g.;7;1;191*6885
+Šilutė;Žalgirio g.;5;1;
+Klaipėda;Žalgirio g.;5;3;150*5689
+Klaipėda;Žalgirio g.;5;2;150*5689
+Klaipėda;Žalgirio g.;5;1;150*5689
+Šilutė;Žalgirio g.;4;1;
+Klaipėda;Žalgirio g.;3;3;191*6885
+Klaipėda;Žalgirio g.;3;1;386
+Klaipėda;Žalgirio g.;3;2;236
+Klaipėda;Žalgirio g.;1;2;137
+Klaipėda;Žalgirio g.;1;1;156
+Klaipėda;Žalgirio g.;1;3;191*6885
+Palanga;Vytauto g.;167;1;5rakteliai14788
+Palanga;Vytauto g.;157;3;00skambutis2738skambutis
+Palanga;Vytauto g.;157;6;00skambutis2768skambutis
+Palanga;Vytauto g.;157;5;00skambutis2758skambutis
+Palanga;Vytauto g.;157;1;00skambutis2718skambutis
+Palanga;Vytauto g.;157;2;00skambutis2728skambutis
+Palanga;Vytauto g.;157;4;00skambutis2748skambutis
+Palanga;Vytauto g.;157;7;nėra
+Palanga;Vytauto g.;155A;1;Nėra
+Palanga;Vytauto g. 155A -;senas;1;Nėra
+Palanga;Vytauto g.;115;1;
+Tauragė;Vytauto g.;50;1;
+Tauragė;Vytauto g.;50;2;
+Tauragė;Vytauto g.;50;3;
+Pagėgiai;Vytauto g.;34;1;
+Šilutė;Vytauto g.;29;3;150
+Šilutė;Vytauto g.;29;4;38
+Šilutė;Vytauto g.;29;2;38
+Šilutė;Vytauto g.;29;1;38
+Pagėgiai;Vytauto g.;24A;1;
+Šilutė;Vytauto g.;15a;1;
+Šilutė;Vytauto g.;15;1;
+Klaipėda;Vytauto g.;14;1;239
+Klaipėda;Vytauto g.;14;2;
+Pagėgiai;Vytauto g.;12;1;
+Klaipėda;Vytauto g.;12;5;
+Klaipėda;Vytauto g.;12;2;RAKINAMA
+Klaipėda;Vytauto g.;12;3;
+Klaipėda;Vytauto g.;12;4;
+Klaipėda;Vytauto g.;12;6;
+Klaipėda;Vytauto g.;12;1;RAKINAMA
+Šilutė;Vytauto g.;11;1;
+Klaipėda;Vytauto g.;10;1;3*1107
+Klaipėda;Vytauto g.;8;1;
+Klaipėda;Vytauto g.;6;1;38
+Pagėgiai;Vytauto g.;5A;1;
+Pagėgiai;Vytauto g.;4A;1;
+Šilutė;Vytauto g.;4;1;
+Šilutė;Vytauto g.;4;2;
+Klaipėda;Vytauto g.;4;1;
+Palanga;Vytauto g. 4;K6;1;20*2020
+Palanga;Vytauto g. 4;K5;1;
+Palanga;Vytauto g. 4;K4;1;
+Palanga;Vytauto g. 4;K4;2;
+Palanga;Vytauto g. 4;K3;1;
+Palanga;Vytauto g. 4;K2;1;
+Palanga;Vytauto g. 4;K13;1;raktas
+Palanga;Vytauto g. 4;K12;1;raktas
+Palanga;Vytauto g. 4;K1;1;
+Šilutė;Vytauto g.;3;1;
+Šilutė;Vytauto g.;2A;2;
+Šilutė;Vytauto g.;2A;1;
+Pagėgiai;Vytauto g.;2;4;
+Pagėgiai;Vytauto g.;2;2;
+Pagėgiai;Vytauto g.;2;1;
+Pagėgiai;Vytauto g.;2;3;
+Usėnų k.;Vytauto g.;1;1;
+Pagėgiai;Vytauto g.;1;1;
+Šilalė;Vytauto Didžiojo g.;15;1;
+Šilalė;Vytauto Didžiojo g.;13;2;38
+Šilalė;Vytauto Didžiojo g.;13;1;38
+Šilalė;Vytauto Didžiojo g.;13;1;
+Šilalė;Vytauto Didžiojo g.;6;1;
+Šilalė;Vytauto Didžiojo g.;6;1;
+Klaipėda;Vyšnių g.;16;1;27
+Klaipėda;Vyšnių g.;16;2;
+Klaipėda;Vyšnių g.;14;1;
+Klaipėda;Vyšnių g.;12;1;
+Pagėgiai;Vydutaičių k.;9;1;
+Šilutė;Vydūno g.;14;1;
+Šilutė;Vydūno g.;8;1;
+Šilutė;Vydūno g.;1;1;
+Klaipėda;Viršutinė g.;3;1;20*2020
+Klaipėda;Viršutinė g.;3;2;20*2020
+Klaipėda;Vingio g.;15;9;26-33-11
+Klaipėda;Vingio g.;15;1;143*4001
+Klaipėda;Vingio g.;15;2;143*4001
+Klaipėda;Vingio g.;13;2;143*4001
+Klaipėda;Vingio g.;13;1;143*4001
+Klaipėda;Vingio g.;11;2;210*0773
+Klaipėda;Vingio g.;11;1;210*0773
+Grabupių k.;Vingio g.;8;2;
+Grabupių k.;Vingio g.;8;1;
+Klaipėda;Vingio g.;3;3;150*6639
+Klaipėda;Vingio g.;3;2;150*6639
+Klaipėda;Vingio g.;3;1;150*6639
+Kentrių k.;Vingio g.;2;1;
+Grabupių k.;Vingio g.;2;2;
+Grabupių k.;Vingio g.;2;3;
+Grabupių k.;Vingio g.;2;1;
+Žemaičių Naumiestis;Vingio g.;3;1;
+Teneniai;Vincento Birbalo g.;2;2;
+Teneniai;Vincento Birbalo g.;2;1;
+Šilutė;Vilų g.;15;1;
+Šilutė;Vilų g.;15;2;
+Šilutė;Vilų g.;7;1;
+Šilutė;Vilų g.;6;1;
+Šilutė;Vilų g.;5;1;
+Neringa;Vilų g.;5;2;
+Neringa;Vilų g.;5;1;
+Šilutė;Vilų g.;4;2;
+Šilutė;Vilų g.;4;1;
+Neringa;Vilų g.;4;1;
+Neringa;Vilų g.;2;1;
+Neringa;Vilų g.;2;3;
+Neringa;Vilų g.;2;2;
+Mažonų k.;Vilties g.;17;1;
+Gorainių k.;Vilties g.;17;1;
+Klaipėda;Vilties g.;9;2;
+Klaipėda;Vilties g.;9;3;
+Klaipėda;Vilties g.;9;1;
+Klaipėda;Vilties g.;7;1;"1*0186; 158/168"
+Klaipėda;Vilties g.;7;2;
+Klaipėda;Vilties g.;6;1;raktas
+Natkiškių k.;Vilties g.;5;1;
+Klaipėda;Vilties g.;5;1;6*8459
+Klaipėda;Vilties g.;4;1;raktas
+Macikų k.;Vilties g.;3;2;
+Macikų k.;Vilties g.;3;1;
+Klaipėda;Vilties g.;3;1;1/0042, 6/9330
+Pagėgiai;Vilniaus g.;40;1;
+Pagėgiai;Vilniaus g.;38;4;
+Pagėgiai;Vilniaus g.;38;2;
+Pagėgiai;Vilniaus g.;38;3;
+Pagėgiai;Vilniaus g.;38;1;
+Pagėgiai;Vilniaus g.;28A;1;
+Pagėgiai;Vilniaus g.;28A;2;
+Pagėgiai;Vilniaus g.;26;1;
+Pagėgiai;Vilniaus g.;25;1;
+Pagėgiai;Vilniaus g.;24A;1;
+Pagėgiai;Vilniaus g.;24;1;
+Pagėgiai;Vilniaus g.;21;2;
+Pagėgiai;Vilniaus g.;21;1;
+Pagėgiai;Vilniaus g.;20;1;
+Pagėgiai;Vilniaus g.;19;1;
+Pagėgiai;Vilniaus g.;7;1;
+Vìlkyčių k.;Vilkyčių g.;19;1;
+Anužių k.;Vilkės g.;16;1;
+Anužių k.;Vilkės g.;12;1;
+Anužių k.;Vilkės g.;2;1;
+Ramučių k.;Viliaus Gaigalaičio g.;15;1;
+Šilutė;Vienybės g.;19;1;
+Palanga;Vėžių g.;22;1;
+Palanga;Vėžių g.;10;2;
+Palanga;Vėžių g.;10;1;Vartai
+Palanga;Vėžių g.;10;1;
+Neringa;Vėtrungių g.;25;1;
+Neringa;Vėtrungių g.;17;1;
+Usėnų sen.;Veržės g.;5;2;
+Usėnų sen.;Veržės g.;5;1;
+Usėnų sen.;Veržės g.;3;2;
+Usėnų sen.;Veržės g.;3;1;
+Dituvos k.;Versmės g.;5;1;
+Dituvos k.;Versmės g.;5;2;
+Tarvydų k.;Verdainės g.;8;2;
+Tarvydų k.;Verdainės g.;8;1;
+Tarvydų k.;Verdainės g.;6;2;
+Tarvydų k.;Verdainės g.;6;1;
+Tarvydų k.;Verdainės g.;4;1;
+Tarvydų k.;Verdainės g.;4;2;
+Šilutė;Ventės g.;4;1;
+Šilutė;Ventės g.;2;1;
+Juknaičių k.;Vengrų g.;3;2;
+Juknaičių k.;Vengrų g.;3;1;
+Vìlkyčių k.;Veiviržo g.;41;1;
+Šilalė;Vasario 16-osios g.;28;2;59
+Šilalė;Vasario 16-osios g.;28;1;
+Šilalė;Vasario 16-osios g.;14;2;7(raktas)2005
+Šilalė;Vasario 16-osios g.;14;1;3(raktas)4174
+Šilalė;Vasario 16-osios g.;13;1;nėra
+Šilalė;Vasario 16-osios g.;11;1;
+Šilalė;Vasario 16-osios g.;9;1;
+Šilalė;Vasario 16-osios g.;7;1;
+Klaipėda;Varpų g.;29;1;60*9155
+Klaipėda;Varpų g.;29;2;60*9155
+Klaipėda;Varpų g.;29;3;60*9155
+Klaipėda;Varpų g.;21;1;170*1397
+Klaipėda;Varpų g.;19;1;*0164361
+Klaipėda;Varpų g.;17;2;"248; 60*9155"
+Klaipėda;Varpų g.;17;1;3*1160
+Klaipėda;Varpų g.;4B;2;
+Klaipėda;Varpų g.;4B;1;
+Klaipėda;Varpų g.;4B;3;
+Klaipėda;Varpų g.;4A;1;
+Klaipėda;Varpų g.;4A;2;
+Traksėdžių k.;Varnėnų g.;1;1;
+Palanga;Vanagupės g.;44;2;12*602
+Palanga;Vanagupės g.;44;3;atskiras įėjimas
+Palanga;Vanagupės g.;44;4;atskiras įėjimas
+Palanga;Vanagupės g.;44;1;1*9423
+Palanga;Vanagupės g.;38;1;1*1111
+Palanga;Vanagupės g.;38;3;
+Palanga;Vanagupės g.;38;2;1*1111
+Palanga;Vanagupės g.;26;1;00skambutis2601skambutis
+Palanga;Vanagupės g.;26;3;00skambutis2603skambutis
+Palanga;Vanagupės g.;26;2;00skambutis2602skambutis
+Palanga;Vanagupės g.;24;3;200*4056
+Palanga;Vanagupės g.;24;1;00skambutis2401skambutis
+Palanga;Vanagupės g.;24;2;01*2402
+Palanga;Vanagupės g.;22A;1;#2022#
+Palanga;Vanagupės g.;22;1;00skambutis2201skambutis
+Palanga;Vanagupės g.;22;2;00skambutis2202skambutis
+Palanga;Vanagupės g.;22;3;00skambutis2203skambutis
+Palanga;Vanagupės g.;13B;1;100*2525
+Šilutė;Valstiečių g.;18;1;
+Šilutė;Valstiečių g.;12;1;
+Galzdonų k.;Valsčiaus g.;6;1;
+Galzdonų k.;Valsčiaus g.;4;1;
+Šilutė;Vakarų g.;3;1;
+Menklaukių k.;Vaitkaičių g.;3;1;
+Menklaukių k.;Vaitkaičių g.;1;1;
+Kintų sen.;Vabalų k.;1;1;
+Šilutė;V. Kudirkos g.;25a;1;
+Šilutė;V. Kudirkos g.;25;2;2525#
+Šilutė;V. Kudirkos g.;25;1;2525#
+Šilutė;V. Kudirkos g.;23A;1;
+Šilutė;V. Kudirkos g.;23A;2;
+Šilutė;V. Kudirkos g.;23;1;
+Šilutė;V. Kudirkos g.;23;2;38
+Šilutė;V. Kudirkos g.;20B;1;
+Šilutė;V. Kudirkos g.;20B;3;
+Šilutė;V. Kudirkos g.;20B;2;
+Šilutė;V. Kudirkos g.;16;1;
+Šilalė;V. Kudirkos g.;14;1;
+Šilutė;V. Kudirkos g.;13;1;
+Šilutė;V. Kudirkos g.;8;3;38
+Šilutė;V. Kudirkos g.;8;2;249
+Šilutė;V. Kudirkos g.;8;4;57
+Šilutė;V. Kudirkos g.;8;1;
+Šilutė;V. Kudirkos g.;7;1;17
+Šilutė;V. Kudirkos g.;6;1;
+Šilutė;V. Kudirkos g.;5;1;
+Šilutė;V. Kudirkos g.;4;1;
+Šilutė;V. Kudirkos g.;3;1;
+Žukų k.;V. Gaigalaičio g.;17;1;
+Žukų k.;V. Gaigalaičio g.;15;1;
+Žukų k.;V. Gaigalaičio g.;14;2;
+Žukų k.;V. Gaigalaičio g.;14;1;
+Žukų k.;V. Gaigalaičio g.;4;1;
+Stubrių k.;Usėnų g.;3;1;
+Šilutė;Uosto g.;5;1;
+Rusnė;Uostadvario g.;15;1;
+Trakininkų k.;Uosių g.;2;1;
+Šilgalių k.;Ūkininkų g.;1;1;
+Palanga;Tvenkinių g.;39;1;
+Vidgirių k.;Tvenkinių g.;4;1;
+Klaipėda;Turgaus g.;29;1;raktas
+Klaipėda;Turgaus g.;29;2;
+Klaipėda;Turgaus g.;27;1;raktas
+Klaipėda;Turgaus g.;25;1;raktas
+Klaipėda;Turgaus g.;23;2;
+Klaipėda;Turgaus g.;23;1;raktas
+Klaipėda;Turgaus g.;22;2;raktas, vartu kodasd 202212
+Klaipėda;Turgaus g.;22;1;raktas, vartu kodas 202212
+Klaipėda;Turgaus g.;22;3;
+Pagėgiai;Turgaus g.;20;1;
+Klaipėda;Turgaus g.;20;2;nėra
+Klaipėda;Turgaus g.;20;1;rakina, vartu kodas 202212
+Klaipėda;Turgaus g.;20;3;nėra
+Klaipėda;Turgaus g.;20;4;nėra
+Šilutė;Turgaus g.;16;1;
+Šilutė;Turgaus g.;15;1;
+Klaipėda;Turgaus g.;13;1;RAKINAMA
+Klaipėda;Turgaus g.;13;2;
+Šilutė;Turgaus g.;12;1;
+Šilutė;Turgaus g.;11;1;
+Klaipėda;Turgaus g.;11;1;
+Klaipėda;Turgaus g.;11;2;
+Klaipėda;Turgaus g.;11;3;
+Šilutė;Turgaus g.;10;1;
+Klaipėda;Turgaus g.;10;9;
+Klaipėda;Turgaus g.;10;7;
+Klaipėda;Turgaus g.;10;5;150*5689
+Klaipėda;Turgaus g.;10;4;150*5689
+Klaipėda;Turgaus g.;10;10;
+Klaipėda;Turgaus g.;10;1;150*5689
+Klaipėda;Turgaus g.;10;8;
+Klaipėda;Turgaus g.;10;6;
+Klaipėda;Turgaus g.;10;2;Rakinama
+Klaipėda;Turgaus g.;10;3;Rakinama
+Šilutė;Turgaus g.;9;1;
+Klaipėda;Turgaus g.;9;1;
+Klaipėda;Turgaus g.;9;3;
+Klaipėda;Turgaus g.;9;4;
+Klaipėda;Turgaus g.;9;2;
+Šilutė;Turgaus g.;8;1;
+Priekulė;Turgaus g.;8;1;
+Priekulė;Turgaus g.;8;3;
+Priekulė;Turgaus g.;8;2;
+Klaipėda;Turgaus g.;8;3;
+Klaipėda;Turgaus g.;8;1;raktas
+Klaipėda;Turgaus g.;8;2;raktas
+Šilutė;Turgaus g.;7;1;
+Klaipėda;Turgaus g.;7;1;
+Klaipėda;Turgaus g.;7;2;
+Šilutė;Turgaus g.;6A;4;
+Šilutė;Turgaus g.;6A;2;
+Šilutė;Turgaus g.;6A;3;
+Šilutė;Turgaus g.;6A;1;
+Klaipėda;Turgaus g.;6;2;
+Klaipėda;Turgaus g.;6;3;
+Klaipėda;Turgaus g.;6;1;
+Klaipėda;Turgaus g.;5;2;
+Klaipėda;Turgaus g.;5;1;
+Šilutė;Turgaus g.;4a;1;
+Šilutė;Turgaus g.;4;1;
+Klaipėda;Turgaus g.;4;2;
+Klaipėda;Turgaus g.;4;3;
+Šilutė;Turgaus g.;3;1;
+Klaipėda;Turgaus g.;3;1;
+Klaipėda;Turgaus g.;3;2;
+Klaipėda;Turgaus g.;3;3;
+Šilutė;Turgaus g.;2;1;
+Pagėgiai;Turgaus g.;2;1;
+Klaipėda;Turgaus a.;24;1;
+Klaipėda;Turgaus a.;17;3;raktas
+Klaipėda;Turgaus a.;17;4;
+Klaipėda;Turgaus a.;17;1;138
+Klaipėda;Turgaus a.;17;2;raktas
+Klaipėda;Turgaus a.;16;1;
+Klaipėda;Turgaus a.;16;2;nėra
+Klaipėda;Turgaus a.;16;1;nėra
+Klaipėda;Turgaus a.;15;1;nerakinama
+Klaipėda;Turgaus a.;13;1;nerakinama
+Klaipėda;Turgaus a.;13;2;
+Klaipėda;Turgaus a.;11;3;
+Klaipėda;Turgaus a.;11;2;
+Klaipėda;Turgaus a.;11;1;
+Klaipėda;Turgaus a.;10;2;150*1590
+Klaipėda;Turgaus a.;10;4;
+Klaipėda;Turgaus a.;10;5;
+Klaipėda;Turgaus a.;10;1;150*1590
+Klaipėda;Turgaus a.;10;3;
+Klaipėda;Turgaus a.;9;2;Nėra
+Klaipėda;Turgaus a.;9;1;Nėra
+Klaipėda;Turgaus a.;7;1;Nėra
+Klaipėda;Turgaus a.;7;2;Nėra
+Katyčiai;Turgaus a.;7;1;
+Klaipėda;Turgaus a.;6;1;Nėra
+Katyčiai;Turgaus a.;5;1;
+Klaipėda;Turgaus a.;4;1;Nėra
+Klaipėda;Turgaus a.;4;2;Nėra
+Klaipėda;Turgaus a.;2;2;158
+Klaipėda;Turgaus a.;2;1;135
+Klaipėda;Turgaus a.;2;3;Nėra/išlaužta
+Klaipėda;Turgaus a.;2;4;
+Klaipėda;Turgaus a.;2;5;
+Klaipėda;Turgaus a.;1;3;Nėra
+Klaipėda;Turgaus a.;1;4;Nėra
+Klaipėda;Turgaus a.;1;2;Nėra
+Klaipėda;Turgaus a.;1;1;190
+Lumpėnų k.;Topolių g.;10;1;
+Lumpėnų k.;Topolių g.;8;1;
+Lumpėnų k.;Topolių g.;8;2;
+Lumpėnų k.;Topolių g.;3;1;
+Pašyšių k.;Topolių g.;2;1;
+Pašyšių k.;Topolių g.;1a;1;
+Klaipėda;Tomo g.;20;3;Nėra
+Klaipėda;Tomo g.;20;2;Nėra
+Klaipėda;Tomo g.;20;1;raktas
+Klaipėda;Tomo g.;16;3;Nėra
+Klaipėda;Tomo g.;16;30;
+Klaipėda;Tomo g.;16;1;150*5689, antros durys350
+Klaipėda;Tomo g.;16;2;150*5689
+Klaipėda;Tomo g.;16;6;Nėra
+Klaipėda;Tomo g.;16;4;Nėra
+Klaipėda;Tomo g.;16;5;Nėra
+Klaipėda;Tomo g.;13;2;Nėra
+Klaipėda;Tomo g.;13;1;raktas
+Klaipėda;Tomo g.;10A;4;Nera
+Klaipėda;Tomo g.;10A;3;Nėra
+Klaipėda;Tomo g.;10A;2;Nėra
+Klaipėda;Tomo g.;10A;1;Nėra
+Klaipėda;Tomo g.;10;1;Nėra
+Klaipėda;Tomo g.;10;2;Nėra
+Klaipėda;Tomo g.;8A;3;Nėra
+Klaipėda;Tomo g.;8A;1;Nėra
+Klaipėda;Tomo g.;8A;2;Nėra
+Klaipėda;Tomo g.;8;1;Nėra
+Klaipėda;Tomo g.;7;1;Nėra
+Šilutė;Tilžės g.;69;1;
+Gaidelių km.;Tilžės g.;68;1;
+Gaidelių km.;Tilžės g.;68;2;
+Šilutė;Tilžės g.;65;1;
+Klaipėda;Tilžės g.;57;1;
+Klaipėda;Tilžės g.;57;2;
+Klaipėda;Tilžės g.;56;1;
+Šilutė;Tilžės g.;49;1;
+Šilutė;Tilžės g.;49;2;
+Klaipėda;Tilžės g.;48A;1;
+Klaipėda;Tilžės g.;48;1;358
+Klaipėda;Tilžės g.;48;30;
+Šilutė;Tilžės g.;42;1;
+Šilutė;Tilžės g.;41;2;
+Šilutė;Tilžės g.;41;1;
+Šilutė;Tilžės g.;40;1;
+Šilutė;Tilžės g.;38;1;
+Šilutė;Tilžės g.;37;1;
+Šilutė;Tilžės g.;35;1;
+Šilutė;Tilžės g.;31a;1;
+Šilutė;Tilžės g.;29a;1;
+Šilutė;Tilžės g.;29;1;
+Šilutė;Tilžės g.;27;1;
+Šilutė;Tilžės g.;27;2;
+Šilutė;Tilžės g.;25;1;
+Šilutė;Tilžės g.;20;1;
+Šilutė;Tilžės g.;19;1;
+Saugų k.;Tilžės g.;18;1;
+Šilutė;Tilžės g.;17;1;
+Šilutė;Tilžės g.;13;1;
+Šilutė;Tilžės g.;9;1;
+Šilutė;Tilžės g.;8;1;
+Šilutė;Tilžės g.;7;1;
+Šilutė;Tilžės g.;5;1;
+Šilutė;Tilžės g.;3;1;
+Šilutė;Tilžės g.;2A;1;
+Šilutė;Tilžės g.;2A;2;
+Šilutė;Tilžės g.;2;1;
+Šilutė;Tilžės g.;1;1;
+Klaipėda;Tiltų g.;29;2;Nėra
+Klaipėda;Tiltų g.;29;1;C3470Z
+Klaipėda;Tiltų g.;27;1;Nėra
+Klaipėda;Tiltų g.;27;2;Nėra
+Klaipėda;Tiltų g.;25;2;Nėra
+Klaipėda;Tiltų g.;25;1;150*5689
+Klaipėda;Tiltų g.;24;2;150*5689
+Klaipėda;Tiltų g.;24;3;Nėra
+Klaipėda;Tiltų g.;24;1;150*5689
+Klaipėda;Tiltų g.;23;1;249
+Klaipėda;Tiltų g.;23;2;Nėra
+Klaipėda;Tiltų g.;22;1;680
+Klaipėda;Tiltų g.;22;2;Nėra
+Klaipėda;Tiltų g.;21;1;2*2954
+Klaipėda;Tiltų g.;21;2;Nėra
+Klaipėda;Tiltų g.;21;3;Nėra
+Klaipėda;Tiltų g.;20A;2;Nėra
+Klaipėda;Tiltų g.;20A;1;1991*
+Klaipėda;Tiltų g.;20;2;Nėra
+Klaipėda;Tiltų g.;20;1;Nėra
+Klaipėda;Tiltų g.;15;2;Nėra
+Klaipėda;Tiltų g.;15;1;60*6827
+Klaipėda;Tiltų g.;15;3;Nėra
+Klaipėda;Tiltų g.;14;1;raktas
+Klaipėda;Tiltų g.;14;2;Nėra
+Klaipėda;Tiltų g.;13;1;Raktas
+Klaipėda;Tiltų g.;13;4;Nėra
+Klaipėda;Tiltų g.;13;3;Nėra
+Klaipėda;Tiltų g.;13;2;Nera
+Klaipėda;Tiltų g.;11;1;raktas
+Klaipėda;Tiltų g.;11;2;Nėra
+Klaipėda;Tiltų g.;9;3;Nėra
+Klaipėda;Tiltų g.;9;1;raktas
+Klaipėda;Tiltų g.;9;2;279
+Klaipėda;Tiltų g.;8;4;Nėra
+Klaipėda;Tiltų g.;8;1;raktas
+Klaipėda;Tiltų g.;8;2;Nėra
+Klaipėda;Tiltų g.;8;3;Nėra
+Klaipėda;Tiltų g.;7;2;raktas
+Klaipėda;Tiltų g.;7;1;256
+Klaipėda;Tiltų g.;6A;1;150*5689
+Klaipėda;Tiltų g.;6A;2;Nėra
+Klaipėda;Tiltų g.;6;1;Nėra
+Klaipėda;Tiltų g.;5;3;Nėra
+Klaipėda;Tiltų g.;5;1;Nėra
+Klaipėda;Tiltų g.;5;4;Nėra
+Klaipėda;Tiltų g.;5;2;Nėra
+Klaipėda;Tiltų g.;4;2;Nėra
+Klaipėda;Tiltų g.;4;1;200*1234
+Klaipėda;Tiltų g.;3;1;Nėra
+Klaipėda;Tiltų g.;3;2;Nėra
+Klaipėda;Tiltų g.;3;3;Nėra
+Klaipėda;Tiltų g.;1;2;Nėra
+Klaipėda;Tiltų g.;1;3;Nėra
+Klaipėda;Tiltų g.;1;1;Nėra
+Sakūčių k.;Tilto g.;12;1;
+Sakūčių k.;Tilto g.;10;1;
+Sakūčių k.;Tilto g.;8;1;
+Žemaitkiemio k.;Tenenio g.;5;1;
+Klaipėda;Teatro g.;7;1;3*5806
+Klaipėda;Teatro g.;7;6;Nėra
+Klaipėda;Teatro g.;7;4;Nėra
+Klaipėda;Teatro g.;7;5;Nėra
+Klaipėda;Teatro g.;7;3;Nėra
+Klaipėda;Teatro g.;7;2;10*5196
+Klaipėda;Teatro g.;5;1;Nėra
+Klaipėda;Teatro g.;5;2;Nėra
+Balčių k.;Tauragės g.;47;1;
+Balčių k.;Tauragės g.;45;1;
+Balčių k.;Tauragės g.;43;1;
+Vainutas;Tauragės g.;13;1;
+Vainutas;Tauragės g.;6;1;
+Šilalė;Tauragės g.;5;1;
+Tauragės Dvaro k.;Tauragės Dvaro g.;30A;2;1415#
+Tauragės Dvaro k.;Tauragės Dvaro g.;30A;1;1566#
+Sausgalvių k.;Tatamiškių g.;19;1;
+Sausgalvių k.;Tatamiškių g.;15;1;
+Klaipėda;Taikos pr.;137;3;110*2479
+Klaipėda;Taikos pr.;137;2;110*2479
+Klaipėda;Taikos pr.;137;1;110*2479
+Klaipėda;Taikos pr.;137;4;110*2479
+Klaipėda;Taikos pr.;129;3;150*2106
+Klaipėda;Taikos pr.;129;2;150*2106
+Klaipėda;Taikos pr.;129;1;150*2106
+Klaipėda;Taikos pr.;127;1;119*1919
+Klaipėda;Taikos pr.;127;4;119/1919
+Klaipėda;Taikos pr.;127;3;789 (359)
+Klaipėda;Taikos pr.;127;2;119*1919
+Klaipėda;Taikos pr.;127;5;119/1919
+Klaipėda;Taikos pr.;125;4;61*1234
+Klaipėda;Taikos pr.;125;3;1370
+Klaipėda;Taikos pr.;125;1;c1346z
+Klaipėda;Taikos pr.;125;2;61*1234
+Klaipėda;Taikos pr.;123;1;Magnetukas
+Klaipėda;Taikos pr.;123;3;"100 r 4361; magnetas"
+Klaipėda;Taikos pr.;123;2;153*4827
+Klaipėda;Taikos pr.;121;1;1469
+Klaipėda;Taikos pr.;121;3;170*6385
+Klaipėda;Taikos pr.;121;4;170*6385
+Klaipėda;Taikos pr.;121;2;170*6385
+Klaipėda;Taikos pr.;121;5;170*6385
+Klaipėda;Taikos pr.;120C;1;
+Klaipėda;Taikos pr.;120B;1;
+Klaipėda;Taikos pr.;120A;1;
+Klaipėda;Taikos pr.;120;1;
+Klaipėda;Taikos pr.;118A;1;
+Klaipėda;Taikos pr.;118;1;
+Klaipėda;Taikos pr.;116;1;
+Klaipėda;Taikos pr.;114;1;
+Klaipėda;Taikos pr.;112;2;150*5658
+Klaipėda;Taikos pr.;112;1;150*5658
+Klaipėda;Taikos pr.;112;4;58*1178
+Klaipėda;Taikos pr.;112;3;150*5658
+Klaipėda;Taikos pr.;104;4;
+Klaipėda;Taikos pr.;104;1;210*3305
+Klaipėda;Taikos pr.;104;3;200*2090
+Klaipėda;Taikos pr.;104;2;c590xy
+Klaipėda;Taikos pr.;102;3;130*0199
+Klaipėda;Taikos pr.;102;4;
+Klaipėda;Taikos pr.;102;2;130*0199
+Klaipėda;Taikos pr.;102;1;130*0199
+Klaipėda;Taikos pr.;92;2;119 * 1919
+Klaipėda;Taikos pr.;92;3;150*4795
+Klaipėda;Taikos pr.;92;1;*1001000
+Klaipėda;Taikos pr.;89;2;61*1234
+Klaipėda;Taikos pr.;89;4;368
+Klaipėda;Taikos pr.;89;1;61*1234
+Klaipėda;Taikos pr.;89;3;61*1234
+Klaipėda;Taikos pr.;89;5;
+Klaipėda;Taikos pr.;88A;3;38
+Klaipėda;Taikos pr.;88A;2;33*9793
+Klaipėda;Taikos pr.;88A;1;33*6900
+Klaipėda;Taikos pr.;88;1;120*1234
+Klaipėda;Taikos pr.;88;2;120*1234
+Klaipėda;Taikos pr.;88;4;120*1234
+Klaipėda;Taikos pr.;88;3;120*1234
+Klaipėda;Taikos pr.;87;3;120*1234
+Klaipėda;Taikos pr.;87;1;120*1234
+Klaipėda;Taikos pr.;87;2;120*1234
+Klaipėda;Taikos pr.;87;4;120*1234
+Klaipėda;Taikos pr.;86;1;150*4429
+Klaipėda;Taikos pr.;85;1;65*7979
+Klaipėda;Taikos pr.;85;4;149
+Klaipėda;Taikos pr.;85;2;65*7979
+Klaipėda;Taikos pr.;85;3;65*7979
+Klaipėda;Taikos pr.;83;4;120*1234
+Klaipėda;Taikos pr.;83;2;380
+Klaipėda;Taikos pr.;83;1;120*1234
+Klaipėda;Taikos pr.;83;5;368
+Klaipėda;Taikos pr.;83;3;126
+Klaipėda;Taikos pr.;83;6;120*1234
+Klaipėda;Taikos pr.;83;7;
+Klaipėda;Taikos pr.;82;3;120*4172
+Klaipėda;Taikos pr.;82;2;137
+Klaipėda;Taikos pr.;82;1;120*4172
+Klaipėda;Taikos pr.;77;3;38
+Klaipėda;Taikos pr.;77;2;246
+Klaipėda;Taikos pr.;77;4;240
+Klaipėda;Taikos pr.;77;1;130*1597
+Klaipėda;Taikos pr.;73;4;247
+Klaipėda;Taikos pr.;73;1;121*5407
+Klaipėda;Taikos pr.;73;5;
+Klaipėda;Taikos pr.;73;2;121*5407
+Klaipėda;Taikos pr.;73;3;240
+Klaipėda;Taikos pr.;71;2;121*5407
+Klaipėda;Taikos pr.;71;6;121*5407
+Klaipėda;Taikos pr.;71;7;
+Klaipėda;Taikos pr.;71;4;359
+Klaipėda;Taikos pr.;71;1;268
+Klaipėda;Taikos pr.;71;5;121*5407
+Klaipėda;Taikos pr.;71;3;121*5407
+Klaipėda;Taikos pr.;59;2;207*4512
+Klaipėda;Taikos pr.;59;5;207*4512
+Klaipėda;Taikos pr.;59;8;207/4512
+Klaipėda;Taikos pr.;59;1;207*4512
+Klaipėda;Taikos pr.;59;7;207/4512
+Klaipėda;Taikos pr.;59;3;128
+Klaipėda;Taikos pr.;59;6;207*4512
+Klaipėda;Taikos pr.;59;4;207*4512
+Klaipėda;Taikos pr.;55;1;4*6166
+Klaipėda;Taikos pr.;55;3;180*1234
+Klaipėda;Taikos pr.;55;5;180*1234
+Klaipėda;Taikos pr.;55;8;106*5924
+Klaipėda;Taikos pr.;55;2;180*1234
+Klaipėda;Taikos pr.;55;6;180/1234
+Klaipėda;Taikos pr.;55;4;180/1234
+Klaipėda;Taikos pr.;55;7;180*1234
+Klaipėda;Taikos pr.;49;1;207*4512
+Klaipėda;Taikos pr.;49;2;207*4512
+Klaipėda;Taikos pr.;49;3;43*7703
+Klaipėda;Taikos pr.;49;4;379
+Klaipėda;Taikos pr.;49;5;357
+Klaipėda;Taikos pr.;49;6;207/4512
+Klaipėda;Taikos pr.;44;1;-
+Klaipėda;Taikos pr.;43;5;207*4512
+Klaipėda;Taikos pr.;43;6;207*4512
+Klaipėda;Taikos pr.;43;2;207*4512
+Klaipėda;Taikos pr.;43;4;207*4512
+Klaipėda;Taikos pr.;43;3;207*4512
+Klaipėda;Taikos pr.;43;1;151/1234
+Klaipėda;Taikos pr.;41;30;
+Klaipėda;Taikos pr.;41;1;151*1234
+Klaipėda;Taikos pr.;35C;1;33*4361
+Klaipėda;Taikos pr.;35C;2;33*4361
+Klaipėda;Taikos pr.;35B;1;202*4321
+Klaipėda;Taikos pr.;35B;2;202*4321
+Klaipėda;Taikos pr.;35A;2;61/1234
+Klaipėda;Taikos pr.;35A;1;61/1234
+Klaipėda;Taikos pr.;35;2;200*1234
+Klaipėda;Taikos pr.;35;1;200*1234
+Klaipėda;Taikos pr.;33;1;201*7401
+Klaipėda;Taikos pr.;33;2;201*7401
+Klaipėda;Taikos pr.;33;3;201*7401
+Klaipėda;Taikos pr.;32A;1;
+Klaipėda;Taikos pr.;31;1;200*1234
+Klaipėda;Taikos pr.;31;2;200*1234
+Klaipėda;Taikos pr.;29;3;201*7401
+Klaipėda;Taikos pr.;29;1;201*7401
+Klaipėda;Taikos pr.;29;2;201*7401
+Klaipėda;Taikos pr.;27;2;207*4512
+Klaipėda;Taikos pr.;27;1;207*4512
+Klaipėda;Taikos pr.;27;3;
+Klaipėda;Taikos pr.;25;2;200*1234
+Klaipėda;Taikos pr.;25;1;200*1234
+Klaipėda;Taikos pr.;23;1;202*4321
+Klaipėda;Taikos pr.;23;3;
+Klaipėda;Taikos pr.;23;2;202*4321
+Klaipėda;Taikos pr.;21B;1;150*5689
+Klaipėda;Taikos pr.;21B;2;150*5689
+Klaipėda;Taikos pr.;21B;3;150*5689
+Klaipėda;Taikos pr.;21A;2;48
+Klaipėda;Taikos pr.;21A;1;490
+Klaipėda;Taikos pr.;21A;3;41*3857
+Klaipėda;Taikos pr.;21;3;247
+Klaipėda;Taikos pr.;21;1;170
+Klaipėda;Taikos pr.;21;2;207/4512
+Klaipėda;Taikos pr.;19B;2;61*1234
+Klaipėda;Taikos pr.;19B;1;61*1234
+Klaipėda;Taikos pr.;19A;2;150*5689
+Klaipėda;Taikos pr.;19A;1;150*5689
+Klaipėda;Taikos pr.;19;3;590
+Klaipėda;Taikos pr.;19;2;200*1234
+Klaipėda;Taikos pr.;19;1;590
+Klaipėda;Taikos pr.;17;1;200*1234
+Klaipėda;Taikos pr.;17;2;200*1234
+Klaipėda;Taikos pr.;17;3;200*1234
+Klaipėda;Taikos pr.;17;4;200*1234
+Klaipėda;Taikos pr.;17;5;
+Nida;Taikos g.;36;1;
+Neringa;Taikos g.;30;3;
+Neringa;Taikos g.;30;2;
+Neringa;Taikos g.;30;1;
+Šilutė;Taikos g.;24;1;
+Nida;Taikos g.;24;2;
+Nida;Taikos g.;24;1;
+Neringa;Taikos g.;24;1;
+Neringa;Taikos g.;24;2;
+Nida;Taikos g.;22;1;
+Nida;Taikos g.;22;2;
+Neringa;Taikos g.;20;1;
+Neringa;Taikos g.;20;2;
+Šilutė;Taikos g.;19a;2;
+Šilutė;Taikos g.;19a;1;
+Šilutė;Taikos g.;19;1;
+Šilutė;Taikos g.;19;2;
+Šilutė;Taikos g.;18;1;
+Šilutė;Taikos g.;17;1;
+Šilutė;Taikos g.;15;1;369
+Nida;Taikos g.;14;4;
+Nida;Taikos g.;14;8;
+Nida;Taikos g.;14;7;
+Nida;Taikos g.;14;2;
+Nida;Taikos g.;14;5;
+Nida;Taikos g.;14;5;
+Nida;Taikos g.;14;3;
+Nida;Taikos g.;14;4;
+Nida;Taikos g.;14;1;
+Nida;Taikos g.;14;8;
+Nida;Taikos g.;14;3;
+Nida;Taikos g.;14;1;
+Nida;Taikos g.;14;2;
+Nida;Taikos g.;14;6;
+Nida;Taikos g.;14;6;
+Nida;Taikos g.;14;7;
+Šilutė;Taikos g.;11;2;38
+Šilutė;Taikos g.;11;1;38
+Šilutė;Taikos g.;11;3;27
+Rusnė;Taikos g.;11;1;
+Rusnė;Taikos g.;11;2;
+Nida;Taikos g.;10A;1;
+Šilutė;Taikos g.;10;2;38
+Šilutė;Taikos g.;10;1;38
+Nida;Taikos g.;10;3;
+Nida;Taikos g.;10;1;
+Nida;Taikos g.;10;2;
+Nida;Taikos g.;10;5;
+Nida;Taikos g.;10;4;
+Neringa;Taikos g.;10;5;
+Neringa;Taikos g.;10;1;
+Neringa;Taikos g.;10;3;
+Neringa;Taikos g.;10;4;
+Neringa;Taikos g.;10;2;
+Rusnė;Taikos g.;9;1;
+Nida;Taikos g.;9;2;
+Nida;Taikos g.;9;1;
+Nida;Taikos g.;9;3;
+Šilutė;Taikos g.;8;1;27
+Šilutė;Taikos g.;8;2;27
+Rusnė;Taikos g.;7b;1;
+Nida;Taikos g.;6;2;
+Nida;Taikos g.;6;3;
+Nida;Taikos g.;6;2;
+Nida;Taikos g.;6;3;
+Nida;Taikos g.;6;1;
+Nida;Taikos g.;6;4;
+Nida;Taikos g.;6;1;
+Nida;Taikos g.;6;5;
+Nida;Taikos g.;6;5;
+Nida;Taikos g.;6;4;
+Šilutė;Taikos g.;5;1;
+Neringa;Taikos g.;4;1;
+Šilutė;Taikos g.;3;1;
+Šilutė;Taikos g.;3;2;
+Nida;Taikos g.;3;1;
+Nida;Taikos g.;3;4;
+Nida;Taikos g.;3;1;
+Nida;Taikos g.;3;2;
+Nida;Taikos g.;3;3;
+Nida;Taikos g.;3;2;
+Nida;Taikos g.;3;1;
+Neringa;Švyturio g.;7;1;
+Neringa;Švyturio g.;3A;1;
+Neringa;Švyturio g.;3;2;
+Neringa;Švyturio g.;3;1;
+Neringa;Švyturio g.;2;1;
+Mažaičių k.;Šviesos g.;17;1;
+Varsėdžiai;Šv. Roko g.;16;2;
+Varsėdžiai;Šv. Roko g.;16;1;
+Šunelių k.;Šunelių k.;1;1;
+Klaipėda;Sulupės g.;20;3;150*5689
+Klaipėda;Sulupės g.;20;5;
+Klaipėda;Sulupės g.;20;2;150*5689
+Klaipėda;Sulupės g.;20;1;150*5689
+Klaipėda;Sulupės g.;20;4;150*5689
+Klaipėda;Sulupės g.;18;3;191*6885
+Klaipėda;Sulupės g.;18;4;191*6885
+Klaipėda;Sulupės g.;18;2;191*6885
+Klaipėda;Sulupės g.;18;1;150*5689
+Klaipėda;Sulupės g.;13A;4;191*6885
+Klaipėda;Sulupės g.;13A;1;191*6885
+Klaipėda;Sulupės g.;13A;3;191*6885
+Klaipėda;Sulupės g.;13A;2;191*6885
+Klaipėda;Sulupės g.;13;3;rakinama
+Klaipėda;Sulupės g.;13;2;191*6885
+Klaipėda;Sulupės g.;13;1;191*6885
+Klaipėda;Sulupės g.;12;2;38
+Klaipėda;Sulupės g.;12;1;150*5689
+Klaipėda;Sulupės g.;12;3;
+Klaipėda;Sulupės g.;11A;1;nera
+Klaipėda;Sulupės g.;11A;2;nera
+Klaipėda;Sulupės g.;10A;3;191*6885
+Klaipėda;Sulupės g.;10A;4;191*6885
+Klaipėda;Sulupės g.;10A;2;191*6885
+Klaipėda;Sulupės g.;10A;1;191*6885
+Klaipėda;Sulupės g.;10;1;137
+Klaipėda;Sulupės g.;10;2;191*6885
+Klaipėda;Sulupės g.;8;1;16*4237
+Klaipėda;Sulupės g.;8;2;1R4030
+Klaipėda;Sulupės g.;7;3;77*5000
+Klaipėda;Sulupės g.;7;4;
+Klaipėda;Sulupės g.;7;1;77*5000
+Klaipėda;Sulupės g.;7;2;77*5000
+Klaipėda;Sulupės g.;5;1;191*6885
+Klaipėda;Sulupės g.;5;3;191*6885
+Klaipėda;Sulupės g.;5;2;191*6885
+Klaipėda;Sulupės g.;5;4;347
+Klaipėda;Sukilėlių g.;20;1;150*1590
+Klaipėda;Sukilėlių g.;18;2;
+Klaipėda;Sukilėlių g.;18;1;
+Klaipėda;Sukilėlių g.;16;1;raktas
+Klaipėda;Sukilėlių g.;16;2;
+Klaipėda;Sukilėlių g.;10;1;raktas
+Klaipėda;Sukilėlių g.;10;2;
+Klaipėda;Sukilėlių g.;8;1;
+Klaipėda;Sukilėlių g.;8;2;
+Klaipėda;Sukilėlių g.;6;3;
+Klaipėda;Sukilėlių g.;6;1;raktas
+Klaipėda;Sukilėlių g.;6;2;
+Klaipėda;Sukilėlių g.;4;3;
+Klaipėda;Sukilėlių g.;4;5;
+Klaipėda;Sukilėlių g.;4;2;
+Klaipėda;Sukilėlių g.;4;1;raktas
+Klaipėda;Sukilėlių g.;4;4;
+Klaipėda;Sukilėlių g.;2;1;raktas
+Klaipėda;Šturmanų g.;38;1;
+Klaipėda;Šturmanų g.;34;1;
+Klaipėda;Šturmanų g.;30;1;
+Klaipėda;Šturmanų g.;28;1;
+Klaipėda;Šturmanų g.;20;4;150*5689
+Klaipėda;Šturmanų g.;20;3;359
+Klaipėda;Šturmanų g.;20;1;340
+Klaipėda;Šturmanų g.;20;2;248
+Klaipėda;Šturmanų g.;14;1;
+Klaipėda;Šturmanų g.;10;1;
+Klaipėda;Šturmanų g.;8;1;
+Klaipėda;Šturmanų g.;3;1;
+Stumbragirių k.;Stumbragirių k.;8;1;
+Klaipėda;Strėvos g.;10;1;191*6885
+Klaipėda;Strėvos g.;10;2;191*6885
+Klaipėda;Strėvos g.;6;1;150*5689
+Klaipėda;Strėvos g.;6;2;150*5689
+Klaipėda;Strėvos g.;6;3;126
+Tauragė;Stoties g.;47;2;
+Tauragė;Stoties g.;47;1;
+Šilutė;Stoties g.;14;1;
+Šilutė;Stoties g.;12a;1;
+Šilutė;Stoties g.;12;1;
+Šilutė;Stoties g.;11;1;
+Šilutė;Stoties g.;10;2;
+Šilutė;Stoties g.;10;3;257
+Šilutė;Stoties g.;10;1;
+Šilutė;Stoties g.;9;1;
+Šilutė;Stoties g.;9;2;
+Šilutė;Stoties g.;7;1;
+Šilutė;Stoties g.;6;1;
+Šilutė;Stoties g.;6;2;
+Šilutė;Stoties g.;5;1;
+Šilutė;Stoties g.;4;2;49
+Šilutė;Stoties g.;4;1;38
+Klaipėda;Statybininkų pr.;35;3;70*4101
+Klaipėda;Statybininkų pr.;35;1;70*4101
+Klaipėda;Statybininkų pr.;35;2;70*4101
+Klaipėda;Statybininkų pr.;33;3;119*1919
+Klaipėda;Statybininkų pr.;33;2;119*1919
+Klaipėda;Statybininkų pr.;33;1;350
+Klaipėda;Statybininkų pr.;27;1;119/1919
+Klaipėda;Statybininkų pr.;25;2;119*1919
+Klaipėda;Statybininkų pr.;25;1;119*1919
+Klaipėda;Statybininkų pr.;23;1;180*3537
+Klaipėda;Statybininkų pr.;23;2;459
+Klaipėda;Statybininkų pr.;21;1;119*1919
+Klaipėda;Statybininkų pr.;21;2;119*1919
+Klaipėda;Statybininkų pr.;17;1;
+Vingininkai;Stanislovo Kuizino g.;2;1;
+Šilutė;Stadiono g.;3;1;
+Klaipėda;Sportininkų g.;17;2;
+Klaipėda;Sportininkų g.;17;4;
+Klaipėda;Sportininkų g.;17;5;
+Klaipėda;Sportininkų g.;17;6;
+Klaipėda;Sportininkų g.;17;3;
+Klaipėda;Sportininkų g.;17;1;
+Palanga;Sodų g.;45;2;140*2043
+Palanga;Sodų g.;45;1;140*2043
+Rusnė;Sodų g.;40;1;
+Žemaičių Naumiestis;Sodų g.;35;1;
+Ciparių k.;Sodų g.;20;1;
+Pagėgiai;Sodų g.;18;1;
+Benininkų k.;Sodų g.;18;1;
+Šilutė;Sodų g.;17;1;
+Šilutė;Sodų g.;12;1;
+Klaipėda;Sodų g.;10;2;
+Klaipėda;Sodų g.;10;1;
+Pašyšių k.;Sodų g.;9;1;
+Klaipėda;Sodų g.;9;1;120*0669
+Klaipėda;Sodų g.;8;1;120*0699
+Pašyšių k.;Sodų g.;7;1;
+Klaipėda;Sodų g.;7;1;150*1578
+Šilutė;Sodų g.;6;1;
+Pašyšių k.;Sodų g.;6;1;
+Pašyšių k.;Sodų g.;6;2;
+Klaipėda;Sodų g.;6;1;5*0385
+Pašyšių k.;Sodų g.;5;1;
+Klaipėda;Sodų g.;5;1;
+Klaipėda;Sodų g.;5;2;
+Pašyšių k.;Sodų g.;4;2;
+Pašyšių k.;Sodų g.;4;1;
+Pašyšių k.;Sodų g.;3;1;
+Pašyšių k.;Sodų g.;3;2;
+Klaipėda;Sodų g.;3;2;
+Klaipėda;Sodų g.;3;1;
+Šilutė;Sodų g.;2;2;
+Šilutė;Sodų g.;2;3;
+Šilutė;Sodų g.;2;1;
+Stubrių k.;Sodų g.;1;2;
+Stubrių k.;Sodų g.;1;1;
+Šilutė;Sodų g.;1;1;459
+Šilutė;Sodų g.;1;2;238
+Šilutė;Sodų g.;1;6;247
+Šilutė;Sodų g.;1;4;219
+Šilutė;Sodų g.;1;3;369
+Šilutė;Sodų g.;1;5;230
+Pašyšių k.;Sodų g.;1;1;
+Pašyšių k.;Sodų g.;1;2;
+Klaipėda;Smilties Pylimo g.;17;1;
+Klaipėda;Smilties Pylimo g.;17;3;
+Klaipėda;Smilties Pylimo g.;17;2;10/1002
+Klaipėda;Smiltelės g.;55;2;99*2551
+Klaipėda;Smiltelės g.;55;1;99*2551
+Klaipėda;Smiltelės g.;47;2;195*4608
+Klaipėda;Smiltelės g.;47;1;3841#
+Klaipėda;Smiltelės g.;12;1;140*1414
+Klaipėda;Smiltelės g.;12;2;140*1414
+Klaipėda;Smiltelės g.;10;1;143*4002
+Klaipėda;Smiltelės g.;10;2;143*4002
+Klaipėda;Smiltelės g.;9;1;650/99*9402
+Klaipėda;Smiltelės g.;8;2;88*9322
+Klaipėda;Smiltelės g.;8;1;88*9322
+Klaipėda;Smiltelės g.;7;1;246/88*7391
+Klaipėda;Smiltelės g.;5;1;119*1919
+Šilutė;Smėlyno g.;4(buvęs2);1;
+Rukų k.;Smėlyno g.;2;1;
+Šilutė;Smėlyno g.;2(buvęs1);1;
+Sugintų k.;Smėlyno g.;1;1;
+Sugintų k.;Smėlyno g.;1;2;
+Sugintų k.;Smėlyno g.;1;3;
+Rukų k.;Smėlyno g.;1;1;
+Rukų k.;Smėlyno g.;1;2;
+Neringa;Skruzdynės g.;18;1;
+Neringa;Skruzdynės g.;18;1;
+Nida;Skruzdynės g.;14;1;
+Neringa;Skruzdynės g.;14;1;
+Neringa;Skruzdynės g.;13;1;
+Neringa;Skruzdynės g.;13;1;
+Neringa;Skruzdynės g.;11;1;
+Neringa;Skruzdynės g.;11;2;
+Neringa;Skruzdynės g.;11;3;
+Neringa;Skruzdynės g.;10;1;
+Neringa;Skruzdynės g.;10;2;
+Neringa;Skruzdynės g.;9A;7;
+Neringa;Skruzdynės g.;9A;5;
+Neringa;Skruzdynės g.;9A;3;
+Neringa;Skruzdynės g.;9A;4;
+Neringa;Skruzdynės g.;9A;1;
+Neringa;Skruzdynės g.;9A;2;
+Neringa;Skruzdynės g.;9A;6;
+Rusnė;Skirvytėlės g.;11a;1;
+Vilkyškiai;Skalvių g.;10;1;
+Šyšgirių k.;Šyšgirių g.;2;1;
+Šyšgirių k.;Šyšgirių g.;1;1;nėra
+Katyčiai;Sirenos g.;5;1;
+Klaipėda;Sinagogų g.;7;1;raktas
+Džiaugėnai;Šilvados g.;1;1;
+Džiaugėnai;Šilvados g.;1;2;
+Klaipėda;Šilutės pl.;90;2;26*3083
+Klaipėda;Šilutės pl.;90;1;143*4002
+Klaipėda;Šilutės pl.;88;2;38
+Klaipėda;Šilutės pl.;88;1;61*1234
+Klaipėda;Šilutės pl.;86;1;50*4909
+Klaipėda;Šilutės pl.;86;2;210*1960
+Klaipėda;Šilutės pl.;44;7;240
+Klaipėda;Šilutės pl.;44;2;165*7979
+Klaipėda;Šilutės pl.;44;3;165*7979
+Klaipėda;Šilutės pl.;44;5;34
+Klaipėda;Šilutės pl.;44;1;165*7979
+Klaipėda;Šilutės pl.;44;4;165*7979
+Klaipėda;Šilutės pl.;44;8;38
+Klaipėda;Šilutės pl.;44;6;459
+Klaipėda;Šilutės pl.;42;3;165*7979
+Klaipėda;Šilutės pl.;42;4;165*7979
+Klaipėda;Šilutės pl.;42;2;165*7979
+Klaipėda;Šilutės pl.;42;1;165*7979
+Klaipėda;Šilutės pl.;36;2;379
+Klaipėda;Šilutės pl.;36;6;459
+Klaipėda;Šilutės pl.;36;3;368
+Klaipėda;Šilutės pl.;36;4;119*1919
+Klaipėda;Šilutės pl.;36;1;119*1919
+Klaipėda;Šilutės pl.;36;5;119*1919
+Klaipėda;Šilutės pl.;24;4;200*1234
+Klaipėda;Šilutės pl.;24;2;200*1234
+Klaipėda;Šilutės pl.;24;6;38
+Klaipėda;Šilutės pl.;24;1;240
+Klaipėda;Šilutės pl.;24;5;258
+Klaipėda;Šilutės pl.;24;3;200*1234
+Klaipėda;Šilutės pl.;12;1;120*1234
+Klaipėda;Šilutės pl.;10;4;150*1590 ir 200*3579
+Klaipėda;Šilutės pl.;10;1;150*1590 ir 200*3579
+Klaipėda;Šilutės pl.;10;3;150*1590 ir 200*3579
+Klaipėda;Šilutės pl.;10;5;210*5689
+Klaipėda;Šilutės pl.;10;6;*1001000 arba 150*1590 ir 200*
+Klaipėda;Šilutės pl.;10;2;210*5689
+Rusnė;Šilutės g.;12;1;
+Rusnė;Šilutės g.;11;1;
+Rusnė;Šilutės g.;10;2;
+Rusnė;Šilutės g.;10;1;
+Juknaičių k.;Šilutės g.;10;1;
+Juknaičių k.;Šilutės g.;10;2;
+Rusnė;Šilutės g.;8;1;
+Rusnė;Šilutės g.;8;2;
+Rusnė;Šilutės g.;7;1;
+Rusnė;Šilutės g.;6;1;
+Rusnė;Šilutės g.;6;2;
+Rusnė;Šilutės g.;5;1;
+Rusnė;Šilutės g.;4;2;
+Rusnė;Šilutės g.;4;1;
+Rusnė;Šilutės g.;4;3;
+Rusnė;Šilutės g.;3a;1;
+Rusnė;Šilutės g.;3;1;
+Katyčiai;Šilutės g.;1;1;
+Juknaičių k.;Šiloko g.;9;1;
+Juknaičių k.;Šiloko g.;9;2;
+Juknaičių k.;Šiloko g.;6;2;
+Juknaičių k.;Šiloko g.;6;1;
+Juknaičių k.;Šiloko g.;5;2;
+Juknaičių k.;Šiloko g.;5;1;
+Juknaičių k.;Šiloko g.;2A;1;
+Traksėdžių k.;Šilojų skg.;2;2;
+Traksėdžių k.;Šilojų skg.;2;1;
+Traksėdžių k.;Šilojų g.;25;2;
+Traksėdžių k.;Šilojų g.;25;1;
+Traksėdžių k.;Šilojų g.;25;3;
+Traksedžių k.;Šilojų g.;23A;3;
+Traksedžių k.;Šilojų g.;23A;2;
+Traksedžių k.;Šilojų g.;23A;1;
+Traksedžių k.;Šilojų g.;23;2;
+Traksedžių k.;Šilojų g.;23;4;
+Traksedžių k.;Šilojų g.;23;3;
+Traksedžių k.;Šilojų g.;23;1;
+Traksėdžių k.;Šilojų g.;21;3;
+Traksėdžių k.;Šilojų g.;21;2;
+Traksėdžių k.;Šilojų g.;21;1;
+Traksėdžių k.;Šilojų g.;16;1;
+Traksedžių k.;Šilojų g.;14;1;
+Traksėdžių k.;Šilojų g.;12;1;
+Traksėdžių k.;Šilojų g.;5A;1;
+Traksedžių k.;Šilojų g.;5;2;8546
+Traksedžių k.;Šilojų g.;5;1;38
+Traksedžių k.;Šilojų g.;5;3;38
+Traksedžių k.;Šilojų g.;3;3;
+Traksedžių k.;Šilojų g.;3;2;
+Traksedžių k.;Šilojų g.;3;1;
+Šilutė;Šilo g.;9;1;
+Šilutė;Šilo g.;8;1;
+Šilutė;Šilo g.;6;1;
+Šilutė;Šilo g.;3;1;
+Kvėdarna;Šilalės g.;39;1;
+Laukuva;Šilalės g.;13;1;
+Žadeikių k.;Šilalės g.;1;2;
+Žadeikių k.;Šilalės g.;1;1;
+Kulėšų k.;Siauruko g.;12;1;
+Kulėšų k.;Siauruko g.;12;2;
+Kulėšų k.;Siauruko g.;8;2;
+Kulėšų k.;Siauruko g.;8;1;
+Kulėšų k.;Siauruko g.;1;1;
+Šereitlaukio k.;Šereitlaukio k.;12;1;
+Šereitlaukio k.;Šereitlaukio k.;9;1;
+Šereitlaukio k.;Šereitlaukio k.;4;1;
+Šereitlaukio k.;Šereitlaukio k.;3;1;
+Vilkyškiai;Šereikos g.;2;1;
+Šakininkų k.;Senvagės g.;14;1;
+Šakininkų k.;Senvagės g.;12;1;
+Piktupėnų k.;Senojo Plento g.;13;1;
+Piktupėnų k.;Senojo Plento g.;5;1;
+Klaipėda;Senoji Smiltelės g.;4A;2;nėra
+Klaipėda;Senoji Smiltelės g.;4A;1;
+Klaipėda;Senoji Smiltelės g.;3;1;
+Klaipėda;Senoji Smiltelės g.;3;2;nėra
+Klaipėda;Senoji Smiltelės g.;1;2;nėra
+Klaipėda;Senoji Smiltelės g.;1;3;
+Klaipėda;Senoji Smiltelės g.;1;1;nėra
+Pykaičiai;Senežerio g.;8;1;
+Klaipėda;Sausio 15-osios g.;24;4;210*5689
+Klaipėda;Sausio 15-osios g.;24;3;210*5689
+Klaipėda;Sausio 15-osios g.;24;2;210*5689
+Klaipėda;Sausio 15-osios g.;24;5;
+Klaipėda;Sausio 15-osios g.;24;1;210*5689
+Klaipėda;Sausio 15-osios g.;22;2;100*1000
+Klaipėda;Sausio 15-osios g.;22;1;100*1000
+Klaipėda;Sausio 15-osios g.;22;3;100*1000
+Klaipėda;Sausio 15-osios g.;20;2;121*2619
+Klaipėda;Sausio 15-osios g.;20;1;121*2619
+Klaipėda;Sausio 15-osios g.;20;3;121*2619
+Klaipėda;Sausio 15-osios g.;18;1;99*1234
+Klaipėda;Sausio 15-osios g.;18;3;61/1234
+Klaipėda;Sausio 15-osios g.;18;2;38
+Klaipėda;Sausio 15-osios g.;14;1;71/1234
+Klaipėda;Sausio 15-osios g.;14;2;-
+Klaipėda;Sausio 15-osios g.;14;3;150/5689
+Klaipėda;Sausio 15-osios g.;12;3;150*5689
+Klaipėda;Sausio 15-osios g.;12;2;150*5689
+Klaipėda;Sausio 15-osios g.;12;1;150*5689
+Klaipėda;Sausio 15-osios g.;10;3;150*1590
+Klaipėda;Sausio 15-osios g.;10;2;150*1590
+Klaipėda;Sausio 15-osios g.;10;4;
+Klaipėda;Sausio 15-osios g.;10;1;150*1590
+Klaipėda;Šaulių g.;52;1;raktas
+Klaipėda;Šaulių g.;50;1;
+Klaipėda;Šaulių g.;45;2;
+Klaipėda;Šaulių g.;45;1;raktas
+Klaipėda;Šaulių g.;44;1;
+Klaipėda;Šaulių g.;44;2;
+Klaipėda;Šaulių g.;44;3;
+Klaipėda;Šaulių g.;43;1;
+Klaipėda;Šaulių g.;42;3;
+Klaipėda;Šaulių g.;42;1;raktas
+Klaipėda;Šaulių g.;42;2;
+Klaipėda;Šaulių g.;40;1;6*1248
+Klaipėda;Šaulių g.;40;2;
+Klaipėda;Šaulių g.;39;2;
+Klaipėda;Šaulių g.;39;1;
+Klaipėda;Šaulių g.;37;1;raktas
+Klaipėda;Šaulių g.;33;1;raktas
+Klaipėda;Šaulių g.;33;2;
+Klaipėda;Šaulių g.;32;3;
+Klaipėda;Šaulių g.;32;2;
+Klaipėda;Šaulių g.;32;1;raktas
+Klaipėda;Šaulių g.;31;1;5689#
+Klaipėda;Šaulių g.;29;2;
+Klaipėda;Šaulių g.;29;3;
+Klaipėda;Šaulių g.;29;1;200*1234
+Klaipėda;Šaulių g.;27;8;
+Klaipėda;Šaulių g.;27;9;
+Klaipėda;Šaulių g.;27;6;
+Klaipėda;Šaulių g.;27;5;200*1234
+Klaipėda;Šaulių g.;27;2;200*1234
+Klaipėda;Šaulių g.;27;1;200*1234
+Klaipėda;Šaulių g.;27;4;200*1234
+Klaipėda;Šaulių g.;27;7;
+Klaipėda;Šaulių g.;27;3;200*1234
+Klaipėda;Šaulių g.;23A;1;raktas
+Klaipėda;Šaulių g.;23A;2;
+Klaipėda;Šaulių g.;23;4;248
+Klaipėda;Šaulių g.;23;1;248
+Klaipėda;Šaulių g.;23;2;248
+Klaipėda;Šaulių g.;23;3;248
+Klaipėda;Šaulių g.;22;1;369
+Klaipėda;Šaulių g.;22;2;raktas
+Klaipėda;Šaulių g.;20;1;raktas
+Klaipėda;Šaulių g.;16;2;20*1178
+Klaipėda;Šaulių g.;16;1;"15*9402; 9*3716"
+Klaipėda;Šaulių g.;14;6;
+Klaipėda;Šaulių g.;14;5;
+Klaipėda;Šaulių g.;14;3;
+Klaipėda;Šaulių g.;14;4;
+Klaipėda;Šaulių g.;14;1;raktas
+Klaipėda;Šaulių g.;14;2;
+Klaipėda;Šaulių g.;13;2;
+Klaipėda;Šaulių g.;13;1;C9612X
+Klaipėda;Šaulių g.;8;1;130* 4078 arba 130*4071
+Klaipėda;Šaulių g.;8;4;
+Klaipėda;Šaulių g.;8;3;130*4078 arba 69*4153
+Klaipėda;Šaulių g.;8;2;18*3328
+Klaipėda;Šaulių g.;8;5;
+Klaipėda;Šaulių g.;5;1;58
+Klaipėda;Šaulių g.;5;2;
+Klaipėda;Šaulių g.;4;2;1*2244
+Klaipėda;Šaulių g.;4;3;
+Klaipėda;Šaulių g.;4;1;150*1578
+Klaipėda;Šaulių g.;3;1;150*1578
+Klaipėda;Šaulių g.;3;3;
+Klaipėda;Šaulių g.;3;2;150*1578
+Mažaičių k.;Saulėtekio g.;9;1;
+Kvėdarna;Saulėtekio g.;1;1;
+Rukų k.;Saulėlydžio g.;3;1;
+Šilalė;Šarūnkalnio g.;3;1;
+Leitgirių k.;Šaltalankių g.;3;1;
+Šakininkų k.;Šakininkų g.;3;1;
+Klaipėda;S. Nėries g.;14;1;359
+Klaipėda;S. Nėries g.;12;2;
+Klaipėda;S. Nėries g.;12;1;147
+Klaipėda;S. Nėries g.;10;7;
+Klaipėda;S. Nėries g.;10;2;
+Klaipėda;S. Nėries g.;10;3;
+Klaipėda;S. Nėries g.;10;5;
+Klaipėda;S. Nėries g.;10;1;raktas/el. spyna
+Klaipėda;S. Nėries g.;10;6;
+Klaipėda;S. Nėries g.;10;4;
+Klaipėda;S. Nėries g.;8;3;
+Klaipėda;S. Nėries g.;8;4;
+Klaipėda;S. Nėries g.;8;5;
+Klaipėda;S. Nėries g.;8;2;86*5016
+Klaipėda;S. Nėries g.;8;1;86*5016
+Klaipėda;S. Nėries g.;6;1;61*1234
+Klaipėda;S. Nėries g.;6;4;
+Klaipėda;S. Nėries g.;6;2;61*1234
+Klaipėda;S. Nėries g.;6;3;
+Vytogala;S. Girėno g.;12;1;
+Vytogala;S. Girėno g.;10;1;
+Vytogala;S. Girėno g.;10;2;
+Klaipėda;S. Daukanto g.;43;3;
+Klaipėda;S. Daukanto g.;43;2;19*4239
+Klaipėda;S. Daukanto g.;43;1;1*8411
+Klaipėda;S. Daukanto g.;38;1;
+Klaipėda;S. Daukanto g.;36;1;40/6216
+Klaipėda;S. Daukanto g.;35;1;39*2849
+Klaipėda;S. Daukanto g.;35;2;200*5164
+Klaipėda;S. Daukanto g.;35;4;200*5164
+Klaipėda;S. Daukanto g.;35;3;21*2614
+Klaipėda;S. Daukanto g.;33;3;200*1234
+Klaipėda;S. Daukanto g.;33;1;200*1234
+Klaipėda;S. Daukanto g.;33;4;
+Klaipėda;S. Daukanto g.;33;2;200*1234
+Klaipėda;S. Daukanto g.;33;5;
+Klaipėda;S. Daukanto g.;28;2;155/2881
+Klaipėda;S. Daukanto g.;28;1;Nerakinama
+Klaipėda;S. Daukanto g.;28;3;Skambutis
+Klaipėda;S. Daukanto g.;27;3;
+Klaipėda;S. Daukanto g.;27;1;8*4590
+Klaipėda;S. Daukanto g.;27;9;
+Klaipėda;S. Daukanto g.;27;8;
+Klaipėda;S. Daukanto g.;27;7;
+Klaipėda;S. Daukanto g.;27;5;
+Klaipėda;S. Daukanto g.;27;4;
+Klaipėda;S. Daukanto g.;27;2;200*1234
+Klaipėda;S. Daukanto g.;27;6;
+Klaipėda;S. Daukanto g.;25;1;nerakinama
+Klaipėda;S. Daukanto g.;25;4;
+Klaipėda;S. Daukanto g.;25;3;
+Klaipėda;S. Daukanto g.;25;2;
+Klaipėda;S. Daukanto g.;23;1;raktas
+Klaipėda;S. Daukanto g.;23;2;
+Klaipėda;S. Daukanto g.;23;3;
+Klaipėda;S. Daukanto g.;20;3;
+Klaipėda;S. Daukanto g.;20;4;
+Klaipėda;S. Daukanto g.;20;1;207*4512
+Klaipėda;S. Daukanto g.;20;2;
+Klaipėda;S. Daukanto g.;20;5;
+Palanga;S. Daukanto g.;10C;1;C1670Z
+Palanga;S. Daukanto g.;10A;2;C1670Z
+Palanga;S. Daukanto g.;10A;1;C2568Y
+Palanga;S. Daukanto g.;10A;3;rakinama
+Palanga;S. Daukanto g.;10;1;Kortelė
+Klaipėda;S. Daukanto g.;2;6;120
+Klaipėda;S. Daukanto g.;2;1;8*3636
+Klaipėda;S. Daukanto g.;2;2;590
+Klaipėda;S. Daukanto g.;2;3;27*7765
+Klaipėda;S. Daukanto g.;2;7;
+Klaipėda;S. Daukanto g.;2;5;197*5472
+Klaipėda;S. Daukanto g.;2;4;43*2102
+Šilutė;Rusnės g.;10;1;
+Šilutė;Rusnės g.;4;1;
+Šilutė;Rusnės g.;2a;1;
+Šilutė;Rusnės g.;2;1;
+Klaipėda;Rumpiškės g.;32;2;100*1000
+Klaipėda;Rumpiškės g.;32;1;100*1000
+Klaipėda;Rumpiškės g.;30;1;101*1234
+Klaipėda;Rumpiškės g.;30;2;101*1234
+Klaipėda;Rumpiškės g.;28;1;19*8649
+Klaipėda;Rumpiškės g.;28;2;40x3015
+Klaipėda;Rumpiškės g.;26A;1;1267
+Klaipėda;Rumpiškės g.;26A;2;200*1234
+Klaipėda;Rumpiškės g.;26;3;40*1362
+Klaipėda;Rumpiškės g.;26;2;158
+Klaipėda;Rumpiškės g.;26;1;169
+Klaipėda;Rumpiškės g.;24A;2;236
+Klaipėda;Rumpiškės g.;24A;1;38
+Klaipėda;Rumpiškės g.;24;1;349
+Klaipėda;Rumpiškės g.;24;2;38
+Klaipėda;Rumpiškės g.;24;3;340
+Klaipėda;Rumpiškės g.;23;1;
+Klaipėda;Rumpiškės g.;22B;3;3569
+Klaipėda;Rumpiškės g.;22B;2;2793
+Klaipėda;Rumpiškės g.;22B;1;1679
+Klaipėda;Rumpiškės g.;22A;3;101*1234
+Klaipėda;Rumpiškės g.;22A;1;101*1234
+Klaipėda;Rumpiškės g.;22A;2;101*1234
+Klaipėda;Rumpiškės g.;22;2;200*1234
+Klaipėda;Rumpiškės g.;22;1;200*1234
+Klaipėda;Rumpiškės g.;22;3;200*1234
+Klaipėda;Rumpiškės g.;21;1;21*1234
+Klaipėda;Rumpiškės g.;20B;2;101*1234
+Klaipėda;Rumpiškės g.;20B;1;101*1234
+Klaipėda;Rumpiškės g.;20A;2;358
+Klaipėda;Rumpiškės g.;20A;1;200*1234
+Klaipėda;Rumpiškės g.;20;2;151*1234
+Klaipėda;Rumpiškės g.;20;1;151*1234
+Klaipėda;Rumpiškės g.;19;2;2*1257
+Klaipėda;Rumpiškės g.;19;1;168
+Klaipėda;Rumpiškės g.;18;4;38
+Klaipėda;Rumpiškės g.;18;1;200*1234
+Klaipėda;Rumpiškės g.;18;3;200*1234
+Klaipėda;Rumpiškės g.;18;2;200*1234
+Klaipėda;Rumpiškės g.;17;1;
+Rudiškė;Rudiškė;9;1;
+Rudiškė;Rudiškė;8;1;
+Klaipėda;Rimkų g.;31;1;nėra
+Klaipėda;Rimkų g.;31;2;
+Klaipėda;Rimkų g.;25;1;
+Klaipėda;Rimkų g.;23;1;
+Klaipėda;Rimkų g.;21;1;
+Klaipėda;Rimkų g.;19;1;
+Klaipėda;Rimkų g.;11;1;nėra
+Klaipėda;Rimkų g.;9;1;
+Klaipėda;Rimkų g.;7;1;nėra
+Klaipėda;Rimkų g.;5;1;
+Klaipėda;Rimkų g.;4;1;nėra
+Klaipėda;Rimkų g.;4;2;nėra
+Klaipėda;Rimkų g.;3;1;nėra
+Klaipėda;Rimkų g.;1;1;nėra
+Bruzdeilyno k.;Rikinės g.;18;1;
+Bruzdeilyno k.;Rikinės g.;16;1;
+Bruzdeilyno k.;Rikinės g.;12;1;
+Klaipėda;Reikjaviko g.;15;2;248
+Klaipėda;Reikjaviko g.;15;4;171*8346
+Klaipėda;Reikjaviko g.;15;3;171*8346
+Klaipėda;Reikjaviko g.;15;1;171*8346
+Klaipėda;Reikjaviko g.;14;4;170*8723
+Klaipėda;Reikjaviko g.;14;2;170/8723
+Klaipėda;Reikjaviko g.;14;1;170*8723
+Klaipėda;Reikjaviko g.;14;3;170*8723
+Klaipėda;Reikjaviko g.;14;6;170*8723
+Klaipėda;Reikjaviko g.;14;5;162*5381
+Klaipėda;Reikjaviko g.;13;1;237,171*8822
+Klaipėda;Reikjaviko g.;13;4;171*8822
+Klaipėda;Reikjaviko g.;13;2;171*8822
+Klaipėda;Reikjaviko g.;13;5;171*8822
+Klaipėda;Reikjaviko g.;13;3;171*8822
+Klaipėda;Reikjaviko g.;13;6;171*8822
+Klaipėda;Reikjaviko g.;11A;1;171*8822
+Klaipėda;Reikjaviko g.;11;1;150*5689
+Klaipėda;Reikjaviko g.;11;2;150*5689
+Klaipėda;Reikjaviko g.;6;2;*1001000
+Klaipėda;Reikjaviko g.;6;5;167*2065
+Klaipėda;Reikjaviko g.;6;3;167*2065
+Klaipėda;Reikjaviko g.;6;6;167*2065
+Klaipėda;Reikjaviko g.;6;4;248
+Klaipėda;Reikjaviko g.;6;1;167*2065
+Klaipėda;Reikjaviko g.;1;3;146*8964
+Klaipėda;Reikjaviko g.;1;1;146*8964
+Klaipėda;Reikjaviko g.;1;2;146*8964
+Klaipėda;Reikjaviko g.;1;4;"137;*1001000"
+Palentinis;Raudžio g.;5;1;
+Žemaičių Naumiestis;Ramybės g.;3;2;
+Žemaičių Naumiestis;Ramybės g.;3;1;
+Klaipėda;Ramioji g.;12;1;200/1234
+Klaipėda;Ramioji g.;10;1;1*8411
+Klaipėda;Ramioji g.;8;1;347
+Klaipėda;Ramioji g.;7;1;
+Klaipėda;Ramioji g.;6;1;
+Klaipėda;Ramioji g.;5;1;200/1235
+Klaipėda;Ramioji g.;4;1;200*1234
+Klaipėda;Ramioji g.;4;2;200*1234
+Klaipėda;Ramioji g.;4;3;200*1234
+Klaipėda;Ramioji g.;3;1;raktas
+Klaipėda;Ramioji g.;1A;1;136
+Lumpėnų k.;Rambyno g.;37;1;
+Bardėnų k.;Rambyno g.;30;1;
+Lumpėnų k.;Rambyno g.;29;1;
+Bardėnų k.;Rambyno g.;18;1;
+Bardėnų k.;Rambyno g.;16;1;
+Bardėnų k.;Rambyno g.;8;1;
+Klaipėda;Rambyno g.;7;1;150*5689
+Klaipėda;Rambyno g.;7;5;*1001000
+Klaipėda;Rambyno g.;7;3;137
+Klaipėda;Rambyno g.;7;4;150*5689
+Klaipėda;Rambyno g.;7;2;150*5689
+Klaipėda;Rambyno g.;6;2;150*5689
+Klaipėda;Rambyno g.;6;4;150*5689
+Klaipėda;Rambyno g.;6;1;150*5689
+Klaipėda;Rambyno g.;6;3;210*0773
+Klaipėda;Rambyno g.;4;1;46r4361
+Klaipėda;Rambyno g.;4;2;46r4361
+Klaipėda;Rambyno g.;4;3;349
+Radvietis;Radvietis;3;1;
+Radvietis;Radvietis;2;1;
+Šilgalių k.;Pušyno g.;16;2;
+Šilgalių k.;Pušyno g.;16;1;
+Šilgalių k.;Pušyno g.;16;3;
+Šilgalių k.;Pušyno g.;15;1;
+Šilgalių k.;Pušyno g.;13;1;
+Šilgalių k.;Pušyno g.;12;1;
+Šilgalių k.;Pušyno g.;12;3;
+Šilgalių k.;Pušyno g.;12;2;
+Šilgalių k.;Pušyno g.;11;1;
+Šilgalių k.;Pušyno g.;9;1;
+Traksėdžių k.;Pušyno g.;8;1;
+Traksėdžių k.;Pušyno g.;8;2;
+Šilgalių k.;Pušyno g.;7;1;
+Šilgalių k.;Pušyno g.;5;1;
+Vėžininkų k.;Pušyno g.;3;1;
+Šilgalių k.;Pušyno g.;1;1;
+Neringa;Purvynės g.;63;1;
+Neringa;Purvynės g.;29;1;
+Neringa;Purvynės g.;29;1;
+Neringa;Purvynės g.;27;1;
+Neringa;Purvynės g.;27;1;
+Neringa;Purvynės g.;25;1;
+Neringa;Purvynės g.;25;1;
+Neringa;Purvynės g.;23;1;
+Neringa;Purvynės g.;23;1;
+Neringa;Purvynės g.;21;1;
+Neringa;Purvynės g.;21;1;
+Neringa;Purvynės g.;15A;4;
+Neringa;Purvynės g.;15A;6;
+Neringa;Purvynės g.;15A;20;
+Neringa;Purvynės g.;15A;13;
+Neringa;Purvynės g.;15A;8;
+Neringa;Purvynės g.;15A;5;
+Neringa;Purvynės g.;15A;21;
+Neringa;Purvynės g.;15A;26;
+Neringa;Purvynės g.;15A;2;
+Neringa;Purvynės g.;15A;3;
+Neringa;Purvynės g.;15A;24;
+Neringa;Purvynės g.;15A;19;
+Neringa;Purvynės g.;15A;25;
+Neringa;Purvynės g.;15A;23;
+Neringa;Purvynės g.;15A;12;
+Neringa;Purvynės g.;15A;22;
+Neringa;Purvynės g.;15A;15;
+Neringa;Purvynės g.;15A;1;
+Neringa;Purvynės g.;15A;9;
+Neringa;Purvynės g.;15A;16;
+Neringa;Purvynės g.;15A;10;
+Neringa;Purvynės g.;15A;7;
+Neringa;Purvynės g.;15A;18;
+Neringa;Purvynės g.;15A;14;
+Neringa;Purvynės g.;15A;17;
+Neringa;Purvynės g.;15A;11;
+Neringa;Purvynės g.;15;3;
+Neringa;Purvynės g.;15;9;
+Neringa;Purvynės g.;15;14;
+Neringa;Purvynės g.;15;6;
+Neringa;Purvynės g.;15;11;
+Neringa;Purvynės g.;15;15;
+Neringa;Purvynės g.;15;13;
+Neringa;Purvynės g.;15;10;
+Neringa;Purvynės g.;15;8;
+Neringa;Purvynės g.;15;12;
+Neringa;Purvynės g.;15;5;
+Neringa;Purvynės g.;15;1;
+Neringa;Purvynės g.;15;7;
+Neringa;Purvynės g.;15;4;
+Neringa;Purvynės g.;15;2;
+Neringa;Purvynės g.;6;2;
+Neringa;Purvynės g.;6;1;
+Neringa;Purvynės g.;4;2;
+Neringa;Purvynės g.;4;1;
+Klaipėda;Priestočio g.;14;2;10
+Klaipėda;Priestočio g.;14;1;raktas
+Klaipėda;Priestočio g.;14;3;
+Klaipėda;Priestočio g.;10;1;38
+Klaipėda;Priestočio g.;10;2;
+Klaipėda;Priestočio g.;4;5;
+Klaipėda;Priestočio g.;4;4;
+Klaipėda;Priestočio g.;4;2;
+Klaipėda;Priestočio g.;4;3;
+Klaipėda;Priestočio g.;4;1;raktas
+Palanga;Prieplaukos g.;14R;1;101*3480
+Palanga;Prieplaukos g.;14R;4;101*3480
+Palanga;Prieplaukos g.;14R;2;101*3480
+Palanga;Prieplaukos g.;14R;6;101*3480
+Palanga;Prieplaukos g.;14R;7;101*3480
+Palanga;Prieplaukos g.;14R;3;101*3480
+Palanga;Prieplaukos g.;14R;5;101*3480
+Palanga;Prieplaukos g.;14P;1;101*3480
+Palanga;Prieplaukos g.;14N;1;101*3480
+Palanga;Prieplaukos g.;14M;1;101*3480
+Palanga;Prieplaukos g.;14L;1;101*3480
+Palanga;Prieplaukos g.;14K;1;101*3480
+Palanga;Prieplaukos g.;14J;1;101*3480
+Palanga;Prieplaukos g.;14H;1;101*3480
+Palanga;Prieplaukos g.;14G;1;101*3480
+Palanga;Prieplaukos g.;14F;1;101*3480
+Palanga;Prieplaukos g.;14E;1;101*3480
+Palanga;Prieplaukos g.;14D;1;101*3480
+Palanga;Prieplaukos g.;14C;1;101*3480
+Palanga;Prieplaukos g.;14B;1;101*3480
+Palanga;Prieplaukos g.;14A;1;101*3480
+Palanga;Prieplaukos g.;14;2;101*3480
+Palanga;Prieplaukos g.;14;4;101*3480
+Palanga;Prieplaukos g.;14;5;101*3480
+Palanga;Prieplaukos g.;14;1;101*3480
+Palanga;Prieplaukos g.;14;6;101*3480
+Palanga;Prieplaukos g.;14;3;101*3480
+Palanga;Prieplaukos g.;14;7;101*3480
+Klaipėda;Priegliaus g.;4;1;pagal butus
+Klaipėda;Priegliaus g.;4;2;nėra
+Neringa;Preilos g.;91;1;
+Neringa;Preilos g.;87;1;
+Neringa;Preilos g.;87;1;
+Neringa;Preilos g.;73B;1;
+Neringa;Preilos g.;63;1;
+Neringa;Preilos g.;63;1;
+Neringa;Preilos g.;57;1;
+Neringa;Preilos g.;57;2;
+Neringa;Preilos g.;57;2;
+Neringa;Preilos g.;57;1;
+Neringa;Preilos g.;47;1;
+Neringa;Preilos g.;47;1;
+Neringa;Preilos g.;47;2;
+Neringa;Preilos g.;47;3;
+Neringa;Preilos g.;2A;1;
+Neringa;Preilos g.;2A;3;
+Neringa;Preilos g.;2A;2;
+Vilkyškiai;Prano Lukošaičio g.;26;1;
+Šilutė;Pramonės g.;3C;2;
+Šilutė;Pramonės g.;3C;1;
+Šilutė;Pramonės g.;3B;1;
+Šilutė;Pramonės g.;3B;2;
+Klaipėda;Poilsio g.;43;1;150*5689
+Klaipėda;Poilsio g.;43;2;*1001000
+Klaipėda;Poilsio g.;39;2;191*6885 arba 150*5689
+Klaipėda;Poilsio g.;39;1;191*6885 arba 150*5689
+Klaipėda;Poilsio g.;37;3;150*5689
+Klaipėda;Poilsio g.;37;1;150*5689
+Klaipėda;Poilsio g.;37;2;150*5689
+Klaipėda;Poilsio g.;37;4;150*5689
+Klaipėda;Poilsio g.;35;1;150*5689
+Klaipėda;Poilsio g.;35;2;150*5689
+Klaipėda;Poilsio g.;33;1;150*5689
+Klaipėda;Poilsio g.;33;2;Raktas
+Klaipėda;Poilsio g.;31;1;150*5689
+Klaipėda;Poilsio g.;31;4;150*5689
+Klaipėda;Poilsio g.;31;3;150*5689
+Klaipėda;Poilsio g.;31;2;150*5689
+Klaipėda;Poilsio g.;23;1;
+Klaipėda;Poilsio g.;21;1;
+Klaipėda;Poilsio g.;20;1;150*8945
+Klaipėda;Poilsio g.;20;3;45*3980
+Klaipėda;Poilsio g.;20;4;150*8945
+Klaipėda;Poilsio g.;20;2;149
+Klaipėda;Poilsio g.;19;1;
+Klaipėda;Poilsio g.;17;1;
+Klaipėda;Poilsio g.;16;1;191*6885
+Klaipėda;Poilsio g.;16;2;191*6885
+Klaipėda;Poilsio g.;16;3;191*6885
+Klaipėda;Poilsio g.;15;1;
+Klaipėda;Poilsio g.;14;3;70*6489
+Klaipėda;Poilsio g.;14;1;70*6489
+Klaipėda;Poilsio g.;14;5;191*6885
+Klaipėda;Poilsio g.;14;4;70*6489
+Klaipėda;Poilsio g.;14;2;70/6489
+Klaipėda;Poilsio g.;12;3;150*5689
+Klaipėda;Poilsio g.;12;1;126
+Klaipėda;Poilsio g.;12;2;326
+Klaipėda;Poilsio g.;9;1;
+Klaipėda;Poilsio g.;4;1;269
+Klaipėda;Poilsio g.;3;1;
+Dvarviečių k.;Plytinės g.;11;1;
+Armalėnų k.;Plytinės g.;8;2;
+Armalėnų k.;Plytinės g.;8;1;
+Gudų k.;Plento g.;11;1;
+Laučių k.;Plento g.;3;1;
+Plaškių k.;Plaškių k.;6;1;
+Plaškių k.;Plaškių k.;1;1;
+Palanga;Pylimo g.;66A;1;
+Palanga;Pylimo g.;66A;2;
+Bardėnų k.;Pylimo g.;6;1;
+Kaltinėnai;Pirties g.;7;1;
+Kaltinėnai;Pirties g.;7;2;
+Kaltinėnai;Pirties g.;5;1;
+Kaltinėnai;Pirties g.;3;1;
+Kvėdarna;Piliakalnio g.;9;1;
+Opstainio k.;Piliakalnio g.;6;1;
+Čiūtelių k.;Piliakalnio g.;6;1;
+Čiūtelių k.;Piliakalnio g.;1;1;
+Žukų k.;Pievų g.;4;1;
+Kerkutviečių k.;Pievų g.;4;1;
+Vilkyškių mstl.;Pievų g.;3;1;
+Vilkyškiai;Pievų g.;1;1;
+Šoliai;Pietinio Kelio g.;23;1;
+Klaipėda;Pietinė g.;18;3;340
+Klaipėda;Pietinė g.;18;1;190*3735
+Klaipėda;Pietinė g.;18;2;190*3735
+Klaipėda;Pietinė g.;17;2;119*1919
+Klaipėda;Pietinė g.;17;3;119*1919
+Klaipėda;Pietinė g.;17;1;119*1919
+Klaipėda;Pietinė g.;13;3;190*3735
+Klaipėda;Pietinė g.;13;4;190*3735
+Klaipėda;Pietinė g.;13;2;190*3735
+Klaipėda;Pietinė g.;13;1;190*3735
+Klaipėda;Pietinė g.;9;1;190*3735
+Klaipėda;Pietinė g.;9;2;190*3735
+Klaipėda;Pietinė g.;9;3;190*3735
+Klaipėda;Pietinė g.;3;2;190*3735
+Klaipėda;Pietinė g.;3;3;190*3735
+Klaipėda;Pietinė g.;3;1;190*3735
+Klaipėda;Pietinė g.;3;4;
+Vilkyškiai;Pieninės g.;1;1;
+Šilutė;Pervažos g.;2;1;
+Neringa;Pervalkos g.;42;1;
+Neringa;Pervalkos g.;42;2;
+Neringa;Pervalkos g.;42;1;
+Neringa;Pervalkos g.;42;2;
+Neringa;Pervalkos g.;8B;1;
+Neringa;Pervalkos g.;8B;1;
+Neringa;Pervalkos g.;8A;1;
+Neringa;Pervalkos g.;8A;1;
+Neringa;Pervalkos g.;7;2;
+Neringa;Pervalkos g.;7;1;
+Bytlaukis;Perkūniškės g.;1;1;
+Leitgirių k.;Paupio g.;15;1;
+Leitgirių k.;Paupio g.;10;1;
+Žukų k.;Pašto g.;1;1;
+Kulėšų k.;Pasienio g.;14;1;
+Šilutė;Parko g.;3;1;
+Klaipėda;Paryžiaus Komunos g.;8;1;4*1962
+Klaipėda;Paryžiaus Komunos g.;2;2;
+Klaipėda;Paryžiaus Komunos g.;2;1;207*4512
+Klaipėda;Paryžiaus Komunos g.;1B;1;38/4122
+Klaipėda;Paryžiaus Komunos g.;1A;1;41/9850
+Pipirų km.;Pamiškės g.;63;1;
+Priekulė;Pamarių g.;5;1;
+Priekulė;Pamarių g.;5;2;
+Neringa;Pamario g.;35;1;
+Neringa;Pamario g.;35;1;
+Neringa;Pamario g.;35;2;
+Neringa;Pamario g.;35;2;
+Neringa;Pamario g.;33;1;
+Neringa;Pamario g.;33;1;
+Neringa;Pamario g.;31;2;
+Neringa;Pamario g.;31;4;
+Neringa;Pamario g.;31;1;
+Neringa;Pamario g.;31;1;
+Neringa;Pamario g.;31;4;
+Neringa;Pamario g.;31;3;
+Neringa;Pamario g.;31;2;
+Neringa;Pamario g.;31;3;
+Neringa;Pamario g.;23;2;
+Neringa;Pamario g.;23;2;
+Neringa;Pamario g.;23;1;
+Neringa;Pamario g.;23;1;
+Neringa;Pamario g.;21;2;
+Neringa;Pamario g.;21;1;
+Neringa;Pamario g.;21;1;
+Neringa;Pamario g.;21;2;
+Neringa;Pamario g.;18;1;
+Neringa;Pamario g.;18;1;
+Neringa;Pamario g.;10;4;
+Neringa;Pamario g.;10;3;
+Neringa;Pamario g.;10;1;
+Neringa;Pamario g.;10;2;
+Neringa;Pamario g.;9;1;
+Neringa;Pamario g.;8;1;
+Lumpėnų k.;Palumpių k.;5;1;
+Lumpėnų k.;Palumpių k.;3;1;
+Lumpėnų k.;Palumpių k.;2;1;
+Dituvos k.;Pakrantės g.;1;2;
+Dituvos k.;Pakrantės g.;1;1;
+Pakarčemio k.;Pakarčemis;5;1;
+Kaltinėnų sen.;Pakarčemio k.;5B;1;
+Kriokiškių k.;Pajūrio g.;21;1;
+Pagenaičių k.;Pagenaičių k.;1;1;
+Šilutė;P. Jakšto g.;4;1;
+Šilutė;P. Jakšto g.;3;1;38
+Šilutė;P. Jakšto g.;3;3;38
+Šilutė;P. Jakšto g.;3;2;38
+Neringa;Nidos-Smiltynės pl.;21;3;
+Neringa;Nidos-Smiltynės pl.;21;4;
+Neringa;Nidos-Smiltynės pl.;21;4;
+Neringa;Nidos-Smiltynės pl.;21;1;
+Neringa;Nidos-Smiltynės pl.;21;2;
+Neringa;Nidos-Smiltynės pl.;21;1;
+Neringa;Nidos-Smiltynės pl.;21;2;
+Neringa;Nidos-Smiltynės pl.;21;3;
+Neringa;Nidos-Smiltynės pl.;10;1;
+Neringa;Nidos-Smiltynės pl.;10;2;
+Klaipėda;Nidos g.;74;2;45*1307
+Klaipėda;Nidos g.;74;1;25*4495
+Klaipėda;Nidos g.;72;2;100*7272
+Klaipėda;Nidos g.;72;1;100*7272
+Klaipėda;Nidos g.;56;1;*1001000
+Klaipėda;Nidos g.;56;6;203*9658
+Klaipėda;Nidos g.;56;5;203*9658
+Klaipėda;Nidos g.;56;3;150*5689
+Klaipėda;Nidos g.;56;4;20*5544
+Klaipėda;Nidos g.;56;2;203*9685
+Klaipėda;Nidos g.;54;1;191*6885
+Klaipėda;Nidos g.;54;4;191*6885
+Klaipėda;Nidos g.;54;3;191*6885
+Klaipėda;Nidos g.;54;2;191*6885
+Klaipėda;Nidos g.;54;6;
+Klaipėda;Nidos g.;54;5;
+Klaipėda;Nidos g.;50;3;150*5689
+Klaipėda;Nidos g.;50;1;150*5689
+Klaipėda;Nidos g.;50;2;458
+Klaipėda;Nidos g.;50;4;150*5689
+Klaipėda;Nidos g.;48;4;61*1234
+Klaipėda;Nidos g.;48;2;61*1234
+Klaipėda;Nidos g.;48;1;61*1234
+Klaipėda;Nidos g.;48;3;61*1234
+Klaipėda;Nidos g.;46;4;191*6885
+Klaipėda;Nidos g.;46;2;150*5689
+Klaipėda;Nidos g.;46;3;150*5689
+Klaipėda;Nidos g.;46;1;150*5689
+Klaipėda;Nidos g.;40C;2;100*4040
+Klaipėda;Nidos g.;40C;5;
+Klaipėda;Nidos g.;40C;1;100*4040
+Klaipėda;Nidos g.;40C;3;100*4040
+Klaipėda;Nidos g.;40C;4;100*4040
+Klaipėda;Nidos g.;40A;1;191*6885
+Klaipėda;Nidos g.;40A;3;C1627Y
+Klaipėda;Nidos g.;40A;2;C0234Y
+Klaipėda;Nidos g.;40;2;50R7529
+Klaipėda;Nidos g.;40;6;191*6885
+Klaipėda;Nidos g.;40;4;150*5689
+Klaipėda;Nidos g.;40;5;191*6885
+Klaipėda;Nidos g.;40;1;150*5689
+Klaipėda;Nidos g.;40;3;150*5689
+Klaipėda;Nidos g.;9;1;150*5689 arba 191*6889
+Klaipėda;Nidos g.;9;3;150*5689
+Klaipėda;Nidos g.;9;4;150*5689
+Klaipėda;Nidos g.;9;2;47
+Klaipėda;Nidos g.;1A;2;*1001000
+Klaipėda;Nidos g.;1A;3;191*6885
+Klaipėda;Nidos g.;1A;4;*1001000 arba *0470962
+Klaipėda;Nidos g.;1A;1;191*6885
+Klaipėda;Nidos g.;1;1;191*6885
+Klaipėda;Nidos g.;1;4;150*5689
+Klaipėda;Nidos g.;1;3;27*2183
+Klaipėda;Nidos g.;1;5;
+Klaipėda;Nidos g.;1;2;25*5250
+Rusnė;Neringos g.;31;1;
+Rusnė;Neringos g.;30;1;
+Rusnė;Neringos g.;26a;1;
+Rusnė;Neringos g.;25;1;
+Rusnė;Neringos g.;23;1;
+Rusnė;Neringos g.;19;1;
+Rusnė;Neringos g.;14;1;
+Rusnė;Neringos g.;13;1;
+Rusnė;Neringos g.;11;1;
+Rusnė;Neringos g.;6;1;
+Rusnė;Neringos g.;6;2;
+Rusnė;Neringos g.;5A;1;
+Rusnė;Neringos g.;5;1;
+Rusnė;Neringos g.;4;1;
+Rusnė;Neringos g.;3;1;38
+Rusnė;Neringos g.;1d;1;
+Rusnė;Neringos g.;1;1;
+Upyna;Nepriklausomybės g.;40;1;
+Teneniai;Nepriklausomybės g.;34;1;
+Teneniai;Nepriklausomybės g.;34;2;
+Teneniai;Nepriklausomybės g.;30;1;
+Upyna;Nepriklausomybės g.;19;1;
+Šilalė;Nepriklausomybės g.;5;1;
+Šilalė;Nepriklausomybės g.;5;2;
+Šilalė;Nepriklausomybės g.;4;1;
+Šilalė;Nepriklausomybės g.;2;1;
+Lumpėnų k.;Nepertlaukių k.;1;1;
+Šilutė;Nemuno skg.;9;1;
+Šilutė;Nemuno skg.;7;1;
+Šilutė;Nemuno skg.;6;1;
+Klaipėda;Nemuno g.;133;2;nera
+Klaipėda;Nemuno g.;133;1;nera
+Klaipėda;Nemuno g.;119A;1;nera
+Klaipėda;Nemuno g.;113;1;nera
+Klaipėda;Nemuno g.;113;2;
+Šilutė;Nemuno g.;34;1;
+Panemunė;Nemuno g.;32;1;
+Vėžininkų k.;Nemuno g.;23;1;
+Vėžininkų k.;Nemuno g.;23;2;
+Panemunė;Nemuno g.;21;1;
+Panemunė;Nemuno g.;21;2;
+Rusnė;Nemuno g.;17;1;
+Rusnė;Nemuno g.;13;1;
+Usėnų sen.;Nemuno g.;8;2;
+Usėnų sen.;Nemuno g.;8;1;
+Usėnų sen.;Nemuno g.;6;1;
+Usėnų sen.;Nemuno g.;3;1;
+Rusnė;Nemuno g.;2;1;
+Usėnų sen.;Nemuno g.;1;1;
+Keberkščiai;Nemylo g.;1;1;
+Pagėgiai;Naujoji g.;10;1;
+Stumbragirių k.;Naujapievių k.;8;1;
+Katyčiai;Natkiškių g.;11;1;
+Katyčiai;Natkiškių g.;5;2;
+Katyčiai;Natkiškių g.;5;1;
+Klaipėda;Naikupės g.;52;2;
+Klaipėda;Naikupės g.;52;3;
+Klaipėda;Naikupės g.;52;1;
+Klaipėda;Naikupės g.;48;1;
+Klaipėda;Naikupės g.;44;1;
+Klaipėda;Naikupės g.;40;1;4*4769
+Klaipėda;Naikupės g.;38;1;358
+Klaipėda;Naikupės g.;38;2;230*8242
+Klaipėda;Naikupės g.;36;1;130
+Klaipėda;Naikupės g.;19;2;191*6885
+Klaipėda;Naikupės g.;19;4;191*6885
+Klaipėda;Naikupės g.;19;3;191*6885
+Klaipėda;Naikupės g.;19;1;191*6885
+Klaipėda;Naikupės g.;17A;4;150*5689
+Klaipėda;Naikupės g.;17A;1;150*5689
+Klaipėda;Naikupės g.;17A;2;150*5689
+Klaipėda;Naikupės g.;17A;3;150*5689
+Klaipėda;Naikupės g.;16;5;199*7801
+Klaipėda;Naikupės g.;16;3;79*3841
+Klaipėda;Naikupės g.;16;6;*1001000
+Klaipėda;Naikupės g.;16;4;199*7801
+Klaipėda;Naikupės g.;16;2;199*7801
+Klaipėda;Naikupės g.;16;1;150*5689
+Klaipėda;Naikupės g.;14;3;61*1234
+Klaipėda;Naikupės g.;14;5;raktas
+Klaipėda;Naikupės g.;14;1;9*3896
+Klaipėda;Naikupės g.;14;2;468
+Klaipėda;Naikupės g.;14;4;31r4361
+Klaipėda;Naikupės g.;14;6;
+Klaipėda;Naikupės g.;12A;2;C2367Z
+Klaipėda;Naikupės g.;12A;1;191*6885
+Klaipėda;Naikupės g.;12A;3;191*6885
+Klaipėda;Naikupės g.;11;2;nera
+Klaipėda;Naikupės g.;11;1;nera
+Klaipėda;Naikupės g.;11;3;
+Klaipėda;Naikupės g.;10A;3;90*4599
+Klaipėda;Naikupės g.;10A;4;138
+Klaipėda;Naikupės g.;10A;2;167
+Klaipėda;Naikupės g.;10A;1;90*4599
+Klaipėda;Naikupės g.;10;3;150*5689
+Klaipėda;Naikupės g.;10;2;150*5689
+Klaipėda;Naikupės g.;10;4;
+Klaipėda;Naikupės g.;10;1;150*5689
+Klaipėda;Naikupės g.;9A;2;38
+Klaipėda;Naikupės g.;9A;3;123
+Klaipėda;Naikupės g.;9A;1;191*6885
+Klaipėda;Naikupės g.;9A;4;191*6885
+Klaipėda;Naikupės g.;9;1;191*6885
+Klaipėda;Naikupės g.;9;2;191*6885
+Klaipėda;Naikupės g.;9;3;
+Klaipėda;Naikupės g.;8A;4;191*6885
+Klaipėda;Naikupės g.;8A;1;150*5689
+Klaipėda;Naikupės g.;8A;3;150*5689 arba 191*6885
+Klaipėda;Naikupės g.;8A;2;25
+Klaipėda;Naikupės g.;8;3;Raktas
+Klaipėda;Naikupės g.;8;2;138
+Klaipėda;Naikupės g.;8;1;385
+Klaipėda;Naikupės g.;7A;2;191*6885
+Klaipėda;Naikupės g.;7A;1;191*6885
+Klaipėda;Naikupės g.;7;3;138
+Klaipėda;Naikupės g.;7;2;147
+Klaipėda;Naikupės g.;7;4;
+Klaipėda;Naikupės g.;7;5;
+Klaipėda;Naikupės g.;7;1;246
+Klaipėda;Naikupės g.;6;2;246
+Klaipėda;Naikupės g.;6;1;191*6885
+Klaipėda;Naikupės g.;6;3;191*6885
+Klaipėda;Naikupės g.;4;3;191*6885
+Klaipėda;Naikupės g.;4;1;126
+Klaipėda;Naikupės g.;4;2;150*5689
+Neringa;Naglių g.;30;1;
+Neringa;Naglių g.;19;3;
+Neringa;Naglių g.;19;2;
+Neringa;Naglių g.;19;1;
+Neringa;Naglių g.;19;1;
+Neringa;Naglių g.;19;3;
+Neringa;Naglių g.;19;2;
+Neringa;Naglių g.;7;2;
+Neringa;Naglių g.;7;3;
+Neringa;Naglių g.;7;4;
+Neringa;Naglių g.;7;1;
+Neringa;Naglių g.;3;2;
+Neringa;Naglių g.;3;1;
+Neringa;Naglių g.;3;3;
+Panemunė;Mokyklos g.;38;1;
+Šilgalių k.;Mokyklos g.;5;2;
+Šilgalių k.;Mokyklos g.;5;1;
+Rukų k.;Mokyklos g.;5;1;
+Mociškių k.;Mokyklos g.;5;1;
+Panemunė;Mokyklos g.;4;2;
+Naujasis Obelynas;Mokyklos g.;2;1;nėra
+Kiškių k.;Mokyklos g.;1;1;
+Kanteriškių k.;Mokyklos g.;1;1;
+Šilutė;Miško g.;6;1;
+Šilutė;Miško g.;4;2;23
+Šilutė;Miško g.;4;1;23
+Šilutė;Miško g.;4;4;27
+Šilutė;Miško g.;4;3;38
+Šilutė;Miško g.;3;1;
+Neringa;Miško g.;1;1;1617#
+Kvėdarna;Miškelio g.;10;1;
+Degučių k.;Mirglono g.;5;1;
+Klaipėda;Minijos g.;159;3;nėra
+Klaipėda;Minijos g.;159;2;nėra
+Klaipėda;Minijos g.;159;1;Pagal butą
+Klaipėda;Minijos g.;157;2;130*5689
+Klaipėda;Minijos g.;157;4;125*0909
+Klaipėda;Minijos g.;157;3;
+Klaipėda;Minijos g.;157;5;
+Klaipėda;Minijos g.;157;1;589
+Klaipėda;Minijos g.;151;2;150
+Klaipėda;Minijos g.;151;4;
+Klaipėda;Minijos g.;151;3;23
+Klaipėda;Minijos g.;151;1;150*5689
+Klaipėda;Minijos g.;149;1;16*3275
+Klaipėda;Minijos g.;149;2;150*5689
+Klaipėda;Minijos g.;145;3;
+Klaipėda;Minijos g.;145;1;191*6885
+Klaipėda;Minijos g.;145;2;191*6885
+Klaipėda;Minijos g.;144;1;150*5689
+Klaipėda;Minijos g.;144;3;150*5689
+Klaipėda;Minijos g.;144;2;150*5689
+Klaipėda;Minijos g.;144;4;150*5689
+Klaipėda;Minijos g.;142;2;246
+Klaipėda;Minijos g.;142;1;150*5689
+Klaipėda;Minijos g.;142;3;
+Klaipėda;Minijos g.;141;6;
+Klaipėda;Minijos g.;141;7;
+Klaipėda;Minijos g.;141;3;368/286/028
+Klaipėda;Minijos g.;141;2;150*5689
+Klaipėda;Minijos g.;141;4;
+Klaipėda;Minijos g.;141;1;150*5689
+Klaipėda;Minijos g.;141;5;
+Klaipėda;Minijos g.;140;4;
+Klaipėda;Minijos g.;140;1;150*1590
+Klaipėda;Minijos g.;140;2;150*1590
+Klaipėda;Minijos g.;140;3;150*5689, reikia patikslinti
+Klaipėda;Minijos g.;139;2;150*5689
+Klaipėda;Minijos g.;139;4;
+Klaipėda;Minijos g.;139;3;380
+Klaipėda;Minijos g.;139;1;150*5689
+Klaipėda;Minijos g.;138;2;raktas
+Klaipėda;Minijos g.;138;3;
+Klaipėda;Minijos g.;138;1;136
+Klaipėda;Minijos g.;137;1;raktas
+Klaipėda;Minijos g.;137;3;raktas
+Klaipėda;Minijos g.;137;2;126
+Klaipėda;Minijos g.;136;4;
+Klaipėda;Minijos g.;136;1;249
+Klaipėda;Minijos g.;136;6;
+Klaipėda;Minijos g.;136;2;120
+Klaipėda;Minijos g.;136;3;240
+Klaipėda;Minijos g.;136;5;
+Klaipėda;Minijos g.;135;3;150*5689
+Klaipėda;Minijos g.;135;2;150*5689
+Klaipėda;Minijos g.;135;1;"150*5689; 126"
+Klaipėda;Minijos g.;134;4;
+Klaipėda;Minijos g.;134;3;100r0913
+Klaipėda;Minijos g.;134;2;100r0913
+Klaipėda;Minijos g.;134;1;raktas
+Klaipėda;Minijos g.;133;2;156
+Klaipėda;Minijos g.;133;1;156
+Klaipėda;Minijos g.;133;3;magnetukas
+Klaipėda;Minijos g.;132;3;150*5689
+Klaipėda;Minijos g.;132;2;150*5689
+Klaipėda;Minijos g.;132;4;
+Klaipėda;Minijos g.;132;1;150*5689
+Klaipėda;Minijos g.;131;3;
+Klaipėda;Minijos g.;131;2;191*6885
+Klaipėda;Minijos g.;131;1;149
+Klaipėda;Minijos g.;130C;3;191*6885
+Klaipėda;Minijos g.;130C;2;150*5689
+Klaipėda;Minijos g.;130C;4;191*6885
+Klaipėda;Minijos g.;130C;1;150*5689
+Klaipėda;Minijos g.;130B;3;191*6885
+Klaipėda;Minijos g.;130B;2;590
+Klaipėda;Minijos g.;130B;4;191*6885
+Klaipėda;Minijos g.;130B;1;191*6885
+Klaipėda;Minijos g.;130A;2;191*6885
+Klaipėda;Minijos g.;130A;4;191*6885
+Klaipėda;Minijos g.;130A;3;191*6885
+Klaipėda;Minijos g.;130A;1;191*6885
+Klaipėda;Minijos g.;130;4;
+Klaipėda;Minijos g.;130;2;raktas
+Klaipėda;Minijos g.;130;3;191*6885
+Klaipėda;Minijos g.;130;1;368
+Klaipėda;Minijos g.;128;1;248
+Klaipėda;Minijos g.;128;2;191*6885
+Klaipėda;Minijos g.;128;3;
+Klaipėda;Minijos g.;126;1;191*6885
+Klaipėda;Minijos g.;126;2;191*6885
+Klaipėda;Minijos g.;126;3;191*6885
+Klaipėda;Minijos g.;117;1;167
+Klaipėda;Minijos g.;115;1;nėra
+Klaipėda;Minijos g.;115;2;nėra
+Klaipėda;Minijos g.;113;1;38
+Lankupių k.;Minijos g.;9;1;
+Pagėgiai;Mikytų k.;8;1;
+Pagėgiai;Mikytų k.;7;1;
+Saugų sen.;Miestalių k.;11;1;
+Klaipėda;Merkio g.;12;1;74
+Pagėgiai;Melioratorių g.;1;2;
+Pagėgiai;Melioratorių g.;1;1;
+Šilutė;Melioratorių al.;11;5;38
+Šilutė;Melioratorių al.;11;6;138
+Šilutė;Melioratorių al.;11;3;38
+Šilutė;Melioratorių al.;11;4;26
+Šilutė;Melioratorių al.;11;1;38
+Šilutė;Melioratorių al.;11;2;38
+Šilutė;Melioratorių al.;9;1;38
+Šilutė;Melioratorių al.;9;4;38
+Šilutė;Melioratorių al.;9;3;450
+Šilutė;Melioratorių al.;9;5;38
+Šilutė;Melioratorių al.;9;2;38
+Šilutė;Melioratorių al.;8;1;
+Šilutė;Melioratorių al.;8;3;
+Šilutė;Melioratorių al.;8;5;57
+Šilutė;Melioratorių al.;8;2;
+Šilutė;Melioratorių al.;8;4;
+Šilutė;Melioratorių al.;7;2;38
+Šilutė;Melioratorių al.;7;4;38
+Šilutė;Melioratorių al.;7;1;38
+Šilutė;Melioratorių al.;7;3;38
+Šilutė;Melioratorių al.;7;5;38
+Šilutė;Melioratorių al.;6;3;1011
+Šilutė;Melioratorių al.;6;1;2684
+Šilutė;Melioratorių al.;6;2;4466
+Šilutė;Melioratorių al.;5;1;
+Šilutė;Melioratorių al.;5;3;
+Šilutė;Melioratorių al.;5;2;
+Šilutė;Melioracijos g.;24;1;
+Šilutė;Melioracijos g.;20;1;
+Šilutė;Melioracijos g.;18;1;
+Šilutė;Melioracijos g.;10;1;
+Palanga;Mėguvos g.;9;1;1*3489
+Palanga;Medvalakio g.;12A;3;59*0059
+Palanga;Medvalakio g.;12A;1;1*0001
+Palanga;Medvalakio g.;12A;2;36*1234
+Palanga;Medvalakio g.;12;2;36*1234
+Palanga;Medvalakio g.;12;1;1*1234
+Palanga;Medvalakio g.;12;3;59*1234
+Meišlaukių k.;Medeinos g.;25;1;
+Mažrimaičių k.;Mažrimaičių k.;7;1;
+Saugų k.;Mažosios Lietuvos g.;23;1;
+Saugų sen.;Mažosios Lietuvos g.;20;1;
+Saugų k.;Mažosios Lietuvos g.;19;1;
+Saugų k.;Mažosios Lietuvos g.;16;2;
+Saugų k.;Mažosios Lietuvos g.;16;1;
+Saugų sen.;Mažosios Lietuvos g.;14;1;
+Saugų sen.;Mažosios Lietuvos g.;14;2;
+Saugų k.;Mažosios Lietuvos g.;8;1;
+Saugų k.;Mažosios Lietuvos g.;2A;2;
+Saugų k.;Mažosios Lietuvos g.;2A;1;
+Kairių k.;Marių g.;5;1;
+Kairių k.;Marių g.;3;1;
+Mantvilaičių k.;Mantvilaičių k.;2;1;
+Mankiškė;Mankiškė;7;1;
+Gaidelių k.;Malūnų g.;8;1;
+Vìlkyčių k.;Malūno g.;13;1;
+Pakamonių k.;Malūno g.;11;2;
+Pakamonių k.;Malūno g.;11;1;
+Vidgirių k.;Malūno g.;8;2;
+Vidgirių k.;Malūno g.;8;1;
+Vidgirių k.;Malūno g.;8;3;
+Vidgirių k.;Malūno g.;7;1;
+Pagėgiai;Malūno g.;5;1;
+Vìlkyčių k.;Malūno g.;3;1;
+Vìlkyčių k.;Malūno g.;2;1;
+Pakamonių k.;Malūno g.;2;1;
+Pagėgiai;Malūno g.;1;1;
+Šilalė;Maironio g.;25;2;38
+Šilalė;Maironio g.;25;1;16
+Šilalė;Maironio g.;25;3;nėra
+Šilalė;Maironio g.;24;1;38
+Šilalė;Maironio g.;24;3;
+Šilalė;Maironio g.;24;2;
+Šilalė;Maironio g.;24;4;
+Šilalė;Maironio g.;23;3;38
+Šilalė;Maironio g.;23;1;23
+Šilalė;Maironio g.;23;2;23
+Šilalė;Maironio g.;22;1;nėra
+Šilalė;Maironio g.;22;2;nėra
+Šilalė;Maironio g.;22;3;16
+Šilalė;Maironio g.;21;1;nėra
+Šilalė;Maironio g.;21;3;nėra
+Šilalė;Maironio g.;21;2;nėra
+Šilalė;Maironio g.;19;1;38
+Šilalė;Maironio g.;19;3;38
+Šilalė;Maironio g.;19;2;16
+Šilalė;M. Valančiaus g.;4;2;
+Šilalė;M. Valančiaus g.;4;1;
+Klaipėda;M. Mažvydo al.;11;9;
+Klaipėda;M. Mažvydo al.;11;4;
+Klaipėda;M. Mažvydo al.;11;10;
+Klaipėda;M. Mažvydo al.;11;5;
+Klaipėda;M. Mažvydo al.;11;11;
+Klaipėda;M. Mažvydo al.;11;6;
+Klaipėda;M. Mažvydo al.;11;8;
+Klaipėda;M. Mažvydo al.;11;2;200*1234
+Klaipėda;M. Mažvydo al.;11;1;16
+Klaipėda;M. Mažvydo al.;11;7;
+Klaipėda;M. Mažvydo al.;11;3;200*1234
+Klaipėda;M. Mažvydo al.;9A;4;
+Klaipėda;M. Mažvydo al.;9A;1;magnetukas
+Klaipėda;M. Mažvydo al.;9A;3;C0259Y
+Klaipėda;M. Mažvydo al.;9A;5;
+Klaipėda;M. Mažvydo al.;9A;2;368
+Klaipėda;M. Mažvydo al.;9;7;
+Klaipėda;M. Mažvydo al.;9;2;200*1234
+Klaipėda;M. Mažvydo al.;9;3;6*2347
+Klaipėda;M. Mažvydo al.;9;5;
+Klaipėda;M. Mažvydo al.;9;9;
+Klaipėda;M. Mažvydo al.;9;4;
+Klaipėda;M. Mažvydo al.;9;1;6*2347
+Klaipėda;M. Mažvydo al.;9;10;
+Klaipėda;M. Mažvydo al.;9;6;
+Klaipėda;M. Mažvydo al.;9;8;
+Klaipėda;M. Mažvydo al.;7;3;
+Klaipėda;M. Mažvydo al.;7;4;
+Klaipėda;M. Mažvydo al.;7;5;
+Klaipėda;M. Mažvydo al.;7;2;61*1234
+Klaipėda;M. Mažvydo al.;7;6;
+Klaipėda;M. Mažvydo al.;7;1;4*4653
+Klaipėda;M. Mažvydo al.;6;3;
+Klaipėda;M. Mažvydo al.;6;4;
+Klaipėda;M. Mažvydo al.;6;5;
+Klaipėda;M. Mažvydo al.;6;6;
+Klaipėda;M. Mažvydo al.;6;2;
+Klaipėda;M. Mažvydo al.;6;7;
+Klaipėda;M. Mažvydo al.;6;9;
+Klaipėda;M. Mažvydo al.;6;8;
+Klaipėda;M. Mažvydo al.;6;1;61*1234
+Klaipėda;M. Mažvydo al.;5;4;
+Klaipėda;M. Mažvydo al.;5;3;18raktas6851
+Klaipėda;M. Mažvydo al.;5;7;
+Klaipėda;M. Mažvydo al.;5;5;
+Klaipėda;M. Mažvydo al.;5;6;
+Klaipėda;M. Mažvydo al.;5;1;3*7933
+Klaipėda;M. Mažvydo al.;5;8;
+Klaipėda;M. Mažvydo al.;5;2;15*1403
+Aukštkiemių k.;M. Londono g.;32;1;*02121
+Aukštkiemių k.;M. Londono g.;32;2;raktas turi avarinė
+Pagėgiai;M. Jankaus g.;23;1;
+Šilutė;M. Jankaus g.;13a;1;
+Šilutė;M. Jankaus g.;9;1;
+Šilutė;M. Jankaus g.;6d;1;
+Šilutė;M. Jankaus g.;6d;2;
+Šilutė;M. Jankaus g.;6b;1;
+Šilutė;M. Jankaus g.;6A;1;
+Šilutė;M. Jankaus g.;5;2;
+Šilutė;M. Jankaus g.;5;3;
+Šilutė;M. Jankaus g.;5;1;
+Šilutė;M. Jankaus g.;3A;2;
+Šilutė;M. Jankaus g.;3A;1;
+Šilutė;M. Jankaus g.;1;1;
+Šilalė;Lokystos g.;18;1;
+Juodainiai;Lygumų g.;11;1;
+Juodainiai;Lygumų g.;7;1;
+Klaipėda;Liubeko g.;1;1;119*1919
+Klaipėda;Liubeko g.;1;2;38
+Pajūralis;Liubarto g.;5;1;
+Pajūralis;Liubarto g.;3;1;
+Klaipėda;Ligoninės g.;5;1;6*4277
+Klaipėda;Ligoninės g.;5;2;
+Klaipėda;Ligoninės g.;2;2;13*1361
+Klaipėda;Ligoninės g.;2;1;2*9536
+Šilutė;Lietuvininkų g.;74;1;
+Šilutė;Lietuvininkų g.;74;2;
+Šilutė;Lietuvininkų g.;62;1;
+Šilutė;Lietuvininkų g.;60;1;
+Šilutė;Lietuvininkų g.;60;2;
+Šilutė;Lietuvininkų g.;60;1;
+Šilutė;Lietuvininkų g.;59;1;
+Šilutė;Lietuvininkų g.;56;1;
+Šilutė;Lietuvininkų g.;52;1;
+Šilutė;Lietuvininkų g.;51A;1;
+Šilutė;Lietuvininkų g.;51;1;
+Šilutė;Lietuvininkų g.;50;1;
+Šilutė;Lietuvininkų g.;49;1;
+Šilutė;Lietuvininkų g.;48a;2;
+Šilutė;Lietuvininkų g.;48a;1;
+Šilutė;Lietuvininkų g.;47;1;
+Šilutė;Lietuvininkų g.;46;1;
+Šilutė;Lietuvininkų g.;45;1;
+Šilutė;Lietuvininkų g.;44;1;
+Šilutė;Lietuvininkų g.;43;1;
+Šilutė;Lietuvininkų g.;42a;1;
+Šilutė;Lietuvininkų g.;41;1;40
+Šilutė;Lietuvininkų g.;40;1;40
+Šilutė;Lietuvininkų g.;28;1;
+Šilutė;Lietuvininkų g.;27a;1;
+Šilutė;Lietuvininkų g.;26;1;
+Šilutė;Lietuvininkų g.;25;1;
+Šilutė;Lietuvininkų g.;24;1;
+Šilutė;Lietuvininkų g.;20a;1;
+Šilutė;Lietuvininkų g.;20;1;
+Šilutė;Lietuvininkų g.;16a;1;
+Šilutė;Lietuvininkų g.;16;1;
+Šilutė;Lietuvininkų g.;14;1;
+Šilutė;Lietuvininkų g.;9;1;
+Šilutė;Lietuvininkų g.;4;1;
+Šilutė;Lietuvininkų g.;3;1;
+Šilutė;Lietuvininkų g.;2a;1;
+Šilutė;Lietuvininkų g.;1;1;
+Šilutė;Lietuvininkų g.;1;2;
+Klaipėda;Lietuvininkų a.;11;1;magnetas
+Klaipėda;Lietuvininkų a.;11;2;
+Klaipėda;Lietuvininkų a.;9;1;magnetas
+Klaipėda;Lietuvininkų a.;9;2;
+Klaipėda;Lietuvininkų a.;4;7;
+Klaipėda;Lietuvininkų a.;4;5;
+Klaipėda;Lietuvininkų a.;4;8;
+Klaipėda;Lietuvininkų a.;4;11;
+Klaipėda;Lietuvininkų a.;4;1;1*1775
+Klaipėda;Lietuvininkų a.;4;9;
+Klaipėda;Lietuvininkų a.;4;2;93*7747
+Klaipėda;Lietuvininkų a.;4;4;36*5376
+Klaipėda;Lietuvininkų a.;4;12;
+Klaipėda;Lietuvininkų a.;4;6;
+Klaipėda;Lietuvininkų a.;4;3;
+Klaipėda;Lietuvininkų a.;4;10;
+Klaipėda;Lietuvininkų a.;1;1;
+Klaipėda;Liepų g.;91;1;
+Klaipėda;Liepų g.;62;1;
+Klaipėda;Liepų g.;55;1;raktas
+Klaipėda;Liepų g.;55;2;
+Klaipėda;Liepų g.;53;1;raktas
+Klaipėda;Liepų g.;52;4;
+Klaipėda;Liepų g.;52;5;
+Klaipėda;Liepų g.;52;1;200*1234
+Klaipėda;Liepų g.;52;3;
+Klaipėda;Liepų g.;52;2;
+Klaipėda;Liepų g.;51;3;
+Klaipėda;Liepų g.;51;2;
+Klaipėda;Liepų g.;51;1;
+Klaipėda;Liepų g.;49;3;
+Klaipėda;Liepų g.;49;5;
+Klaipėda;Liepų g.;49;1;38
+Klaipėda;Liepų g.;49;2;
+Klaipėda;Liepų g.;49;4;
+Klaipėda;Liepų g.;47A;1;
+Klaipėda;Liepų g.;46A;1;90*6879
+Klaipėda;Liepų g.;46A;2;90*6879
+Klaipėda;Liepų g.;44A;1;8*7939
+Klaipėda;Liepų g.;44A;2;90*6879
+Klaipėda;Liepų g.;44;5;
+Klaipėda;Liepų g.;44;4;
+Klaipėda;Liepų g.;44;2;19*8181
+Klaipėda;Liepų g.;44;3;
+Klaipėda;Liepų g.;44;1;17*2668
+Klaipėda;Liepų g.;41;2;
+Klaipėda;Liepų g.;41;1;
+Klaipėda;Liepų g.;41;3;
+Klaipėda;Liepų g.;40A;1;38
+Klaipėda;Liepų g.;40A;2;38
+Klaipėda;Liepų g.;40;1;450
+Klaipėda;Liepų g.;40;4;
+Klaipėda;Liepų g.;40;3;
+Klaipėda;Liepų g.;40;2;270
+Klaipėda;Liepų g.;39;1;258
+Klaipėda;Liepų g.;39;2;
+Klaipėda;Liepų g.;37;1;raktas
+Klaipėda;Liepų g.;36A;1;
+Klaipėda;Liepų g.;36;2;
+Klaipėda;Liepų g.;36;1;raktas
+Klaipėda;Liepų g.;34;1;20*8273
+Klaipėda;Liepų g.;34;3;
+Klaipėda;Liepų g.;34;4;
+Klaipėda;Liepų g.;34;2;38
+Klaipėda;Liepų g.;30;2;121*2619
+Klaipėda;Liepų g.;30;3;27*8798
+Klaipėda;Liepų g.;30;4;
+Klaipėda;Liepų g.;30;1;4*4755
+Klaipėda;Liepų g.;30;5;
+Klaipėda;Liepų g.;28;1;150*3645
+Klaipėda;Liepų g.;28;4;
+Klaipėda;Liepų g.;28;3;
+Klaipėda;Liepų g.;28;5;
+Klaipėda;Liepų g.;28;2;150*3646
+Klaipėda;Liepų g.;26;1;raktas
+Klaipėda;Liepų g.;25;2;200*1234
+Klaipėda;Liepų g.;25;4;
+Klaipėda;Liepų g.;25;1;7*6607
+Klaipėda;Liepų g.;25;3;450
+Klaipėda;Liepų g.;23;1;RAKINAMA
+Klaipėda;Liepų g.;23;2;
+Klaipėda;Liepų g.;22;1;258
+Klaipėda;Liepų g.;22;2;
+Klaipėda;Liepų g.;21;2;"50*1112;150*1112"
+Klaipėda;Liepų g.;21;7;
+Klaipėda;Liepų g.;21;1;170
+Klaipėda;Liepų g.;21;1;170
+Klaipėda;Liepų g.;21;4;
+Klaipėda;Liepų g.;21;2;50*1112
+Klaipėda;Liepų g.;21;5;
+Klaipėda;Liepų g.;21;6;
+Klaipėda;Liepų g.;21;3;150*1112
+Klaipėda;Liepų g.;21;3;72*0548
+Šilutė;Liepų g.;20;4;
+Šilutė;Liepų g.;20;2;
+Šilutė;Liepų g.;20;3;
+Šilutė;Liepų g.;20;1;
+Klaipėda;Liepų g.;20;6;
+Klaipėda;Liepų g.;20;7;
+Klaipėda;Liepų g.;20;2;16*6235
+Klaipėda;Liepų g.;20;3;60*5513
+Klaipėda;Liepų g.;20;1;60*5513
+Klaipėda;Liepų g.;20;4;60*5513
+Klaipėda;Liepų g.;20;5;
+Klaipėda;Liepų g.;20;11;
+Klaipėda;Liepų g.;20;9;
+Klaipėda;Liepų g.;20;10;
+Klaipėda;Liepų g.;20;8;
+Šilutė;Liepų g.;19;1;38
+Klaipėda;Liepų g.;19;7;
+Klaipėda;Liepų g.;19;1;1*3462
+Klaipėda;Liepų g.;19;2;191*8919
+Klaipėda;Liepų g.;19;8;
+Klaipėda;Liepų g.;19;4;
+Klaipėda;Liepų g.;19;3;34*7348
+Klaipėda;Liepų g.;19;5;
+Klaipėda;Liepų g.;19;6;
+Klaipėda;Liepų g. 16 -;1;1;
+Šilutė;Liepų g.;13a;1;236
+Šilutė;Liepų g.;13a;3;127
+Šilutė;Liepų g.;13a;2;237
+Žemaitkiemio k.;Liepų g.;11;1;
+Šilutė;Liepų g.;11;1;38
+Šilutė;Liepų g.;11;2;38
+Šilutė;Liepų g.;11;3;50
+Bliūdsukių k.;Liepų g.;10;1;
+Bliūdsukių k.;Liepų g.;10;2;
+Šilutė;Liepų g.;8;1;
+Klaipėda;Liepų g.;8;3;
+Klaipėda;Liepų g.;8;1;157*5613
+Klaipėda;Liepų g.;8;2;
+Grabupių k.;Liepų g.;5;2;
+Grabupių k.;Liepų g.;5;1;
+Klaipėda;Liepų g.;3;1;
+Klaipėda;Liepų g.;3;3;
+Klaipėda;Liepų g.;3;4;
+Klaipėda;Liepų g.;3;2;
+Grabupių k.;Liepų g.;3;1;
+Grabupių k.;Liepų g.;3;2;
+Klaipėda;Liepų g.;2;4;
+Klaipėda;Liepų g.;2;2;5*5857
+Klaipėda;Liepų g.;2;5;
+Klaipėda;Liepų g.;2;1;1020#
+Klaipėda;Liepų g.;2;3;
+Gudų k.;Liepkalnio g.;1;1;
+Gudų k.;Liepkalnio g.;1;2;
+Pašyšių k.;Lendros g.;15;1;
+Pašyšių k.;Lendros g.;13;1;
+Klaipėda;Lelijų g.;19;1;Magnetukas
+Juknaičių sen.;Leitgirių k.;8;1;
+Juknaičių sen.;Leitgirių k.;6;1;
+Jonikaičių k.;Laukų g.;1;1;
+Jonikaičių k.;Laukų g.;1;2;
+Benininkų k.;Lauko g.;7;1;
+Benininkų k.;Lauko g.;5;1;
+Šilutė;Lauko g.;4;1;
+Benininkų k.;Lauko g.;3;1;
+Lapynų k.;Lapynų dvaro g.;10;1;
+Lapynų k.;Lapynų dvaro g.;6;1;
+Klaipėda;Laivų skg.;4;1;100*1000
+Klaipėda;Laivų skg.;4;2;100*1000
+Klaipėda;Laivų skg.;4;5;
+Klaipėda;Laivų skg.;4;3;
+Klaipėda;Laivų skg.;4;4;
+Žemaičių Naumiestis;Laisvės g.;36;1;
+Šilutė;Laisvės al.;10;2;456
+Šilutė;Laisvės al.;10;1;Magnetas
+Šilutė;Laisvės al.;9;1;38
+Šilutė;Laisvės al.;9;2;38
+Šilutė;Laisvės al.;8;1;56
+Šilutė;Laisvės al.;8;3;138
+Šilutė;Laisvės al.;8;2;7986
+Šilutė;Laisvės al.;7;3;56
+Šilutė;Laisvės al.;7;1;38
+Šilutė;Laisvės al.;7;2;38
+Šilutė;Laisvės al.;6;3;38
+Šilutė;Laisvės al.;6;2;27
+Šilutė;Laisvės al.;6;1;56
+Šilutė;Laisvės al.;5;1;
+Šilutė;Laisvės al.;5;3;
+Šilutė;Laisvės al.;5;2;
+Šilutė;Laisvės al.;4;1;38
+Šilutė;Laisvės al.;4;2;38
+Šilutė;Laisvės al.;4;3;38
+Šilutė;Laisvės al.;3;3;38
+Šilutė;Laisvės al.;3;2;38
+Šilutė;Laisvės al.;3;1;38
+Šilutė;Laisvės al.;2;1;38
+Šilutė;Laisvės al.;2;2;38
+Šilutė;Laisvės al.;2;3;129
+Šilutė;Laisvės al.;1;2;38
+Šilutė;Laisvės al.;1;3;49
+Šilutė;Laisvės al.;1;1;27
+Neringa;L. Rėzos g.;52;1;
+Neringa;L. Rėzos g.;52;4;
+Neringa;L. Rėzos g.;52;2;
+Neringa;L. Rėzos g.;52;3;
+Juodkrantė;L. Rėzos g.;52;4;
+Juodkrantė;L. Rėzos g.;52;2;
+Juodkrantė;L. Rėzos g.;52;3;
+Juodkrantė;L. Rėzos g.;52;1;
+Neringa;L. Rėzos g.;46;3;
+Neringa;L. Rėzos g.;46;1;
+Neringa;L. Rėzos g.;46;2;
+Juodkrantė;L. Rėzos g.;46;3;
+Juodkrantė;L. Rėzos g.;46;1;
+Juodkrantė;L. Rėzos g.;46;2;
+Neringa;L. Rėzos g.;44;3;
+Neringa;L. Rėzos g.;44;1;
+Neringa;L. Rėzos g.;44;2;
+Juodkrantė;L. Rėzos g.;44;1;
+Juodkrantė;L. Rėzos g.;44;3;
+Juodkrantė;L. Rėzos g.;44;2;
+Neringa;L. Rėzos g.;40;1;
+Neringa;L. Rėzos g.;40;3;
+Neringa;L. Rėzos g.;40;4;
+Neringa;L. Rėzos g.;40;5;
+Neringa;L. Rėzos g.;40;2;
+Juodkrantė;L. Rėzos g.;40;1;
+Juodkrantė;L. Rėzos g.;36;1;
+Juodkrantė;L. Rėzos g.;36;1;
+Juodkrantė;L. Rėzos g.;36;2;
+Juodkrantė;L. Rėzos g.;36;2;
+Juodkrantė;L. Rėzos g.;36;3;
+Juodkrantė;L. Rėzos g.;36;3;
+Juodkrantė;L. Rėzos g.;34;1;
+Juodkrantė;L. Rėzos g.;34;2;
+Juodkrantė;L. Rėzos g.;34;1;
+Juodkrantė;L. Rėzos g.;34;2;
+Neringa;L. Rėzos g.;32;2;
+Neringa;L. Rėzos g.;32;1;
+Juodkrantė;L. Rėzos g.;32;2;
+Juodkrantė;L. Rėzos g.;32;3;
+Juodkrantė;L. Rėzos g.;32;1;
+Neringa;L. Rėzos g.;24B;1;
+Neringa;L. Rėzos g.;24B;2;
+Neringa;L. Rėzos g.;24B;3;
+Juodkrantė;L. Rėzos g.;24B;1;
+Juodkrantė;L. Rėzos g.;24B;2;
+Juodkrantė;L. Rėzos g.;24B;3;
+Neringa;L. Rėzos g.;24A;1;
+Neringa;L. Rėzos g.;22;1;nera
+Neringa;L. Rėzos g.;22;2;
+Neringa;L. Rėzos g.;22;5;
+Neringa;L. Rėzos g.;22;3;
+Neringa;L. Rėzos g.;22;4;
+Neringa;L. Rėzos g.;16A;1;nera
+Neringa;L. Rėzos g.;16;2;
+Neringa;L. Rėzos g.;16;1;
+Neringa;L. Rėzos g.;16;3;
+Juodkrantė;L. Rėzos g.;16;1;
+Juodkrantė;L. Rėzos g.;16;2;
+Neringa;L. Rėzos g.;11;3;
+Neringa;L. Rėzos g.;11;1;
+Neringa;L. Rėzos g.;11;2;
+Juodkrantė;L. Rėzos g.;11;3;
+Juodkrantė;L. Rėzos g.;11;1;
+Juodkrantė;L. Rėzos g.;11;2;
+Neringa;L. Rėzos g.;9;1;
+Neringa;L. Rėzos g.;9;2;
+Neringa;L. Rėzos g.;9;3;
+Juodkrantė;L. Rėzos g.;9;1;
+Juodkrantė;L. Rėzos g.;9;2;
+Juodkrantė;L. Rėzos g.;9;3;
+Neringa;L. Rėzos g.;1;1;nera
+Neringa;L. Rėzos g.;1;3;
+Neringa;L. Rėzos g.;1;2;
+Neringa;L. Rėzos g.;1;4;
+Žadeikių k.;Kvėdarnos g.;4;1;
+Kintai;Kuršių g.;42;1;
+Kintai;Kuršių g.;32;1;
+Kintai;Kuršių g.;24;1;
+Kintai;Kuršių g.;21;1;
+Kintai;Kuršių g.;14;1;
+Klaipėda;Kurpių g.;11;1;"raktas; 5058#"
+Klaipėda;Kurpių g.;9;1;183
+Klaipėda;Kurpių g.;7;1;"200*1234; 77/0780"
+Klaipėda;Kurpių g.;7;2;Nėra
+Klaipėda;Kurpių g.;5;2;Nėra
+Klaipėda;Kurpių g.;5;1;Nėra
+Klaipėda;Kurpių g.;4;1;
+Klaipėda;Kurpių g.;2;1;Nėra
+Klaipėda;Kurpių g.;2;2;Nėra
+Klaipėda;Kurpių g.;2;3;Nėra
+Klaipėda;Kurpių g. 1 -;1;1;Nėra
+Klaipėda;Kuosų g.;20;7;
+Klaipėda;Kuosų g.;20;4;
+Klaipėda;Kuosų g.;20;1;Magnetukas
+Klaipėda;Kuosų g.;20;6;
+Klaipėda;Kuosų g.;20;10;
+Klaipėda;Kuosų g.;20;3;
+Klaipėda;Kuosų g.;20;9;
+Klaipėda;Kuosų g.;20;8;
+Klaipėda;Kuosų g.;20;2;Magnetukas
+Klaipėda;Kuosų g.;20;5;
+Klaipėda;Kuosų g.;20;11;
+Klaipėda;Kuosų g.;16;3;Magnetukas
+Klaipėda;Kuosų g.;16;4;Magnetukas
+Klaipėda;Kuosų g.;16;5;Magnetukas
+Klaipėda;Kuosų g.;16;7;Magnetukas
+Klaipėda;Kuosų g.;16;1;Magnetukas
+Klaipėda;Kuosų g.;16;10;Magnetukas
+Klaipėda;Kuosų g.;16;11;raktas
+Klaipėda;Kuosų g.;16;6;Magnetukas
+Klaipėda;Kuosų g.;16;9;Magnetukas
+Klaipėda;Kuosų g.;16;8;Magnetukas
+Klaipėda;Kuosų g.;16;2;Magnetukas
+Klaipėda;Kūlių Vartų g.;5;4;
+Klaipėda;Kūlių Vartų g.;5;6;
+Klaipėda;Kūlių Vartų g.;5;2;136+raktas
+Klaipėda;Kūlių Vartų g.;5;1;200*1234
+Klaipėda;Kūlių Vartų g.;5;7;KITA
+Klaipėda;Kūlių Vartų g.;5;5;
+Klaipėda;Kūlių Vartų g.;5;3;
+Klaipėda;Kūlių Vartų g.;3;1;100*9111
+Klaipėda;Kūlių Vartų g.;3;2;
+Petrelių k.;Kukorų g.;35;1;
+Petrelių k.;Kukorų g.;32;1;
+Petrelių k.;Kukorų g.;26;1;
+Petrelių k.;Kukorų g.;18;1;
+Petrelių k.;Kukorų g.;16;1;
+Rusnė;Kristupo Jurkšaičio g.;6;1;
+Rusnė;Kristupo Jurkšaičio g.;4;1;
+Palanga;Kretingos g.;51;4;100raktelis5118
+Palanga;Kretingos g.;51;5;100raktelis0944
+Palanga;Kretingos g.;51;2;100raktelis2707
+Palanga;Kretingos g.;51;3;100raktelis5208
+Palanga;Kretingos g.;51;1;100raktelis2469
+Krakeniškių k.;Krakeniškių k.;2;1;
+Šilalė;Kovo 11-osios g.;26;1;
+Šilalė;Kovo 11-osios g.;26;2;
+Šilalė;Kovo 11-osios g.;25;1;
+Šilalė;Kovo 11-osios g.;25;2;
+Šilalė;Kovo 11-osios g.;24;2;nėra
+Šilalė;Kovo 11-osios g.;24;1;38
+Šilalė;Kovo 11-osios g.;4;1;38
+Nida;Kopų g.;23;3;
+Nida;Kopų g.;23;2;
+Nida;Kopų g.;23;2;
+Nida;Kopų g.;23;1;
+Nida;Kopų g.;23;3;
+Nida;Kopų g.;23;1;
+Neringa;Kopų g.;21;2;
+Neringa;Kopų g.;21;1;
+Nida;Kopų g.;19;1;
+Nida;Kopų g.;19;2;
+Neringa;Kopų g.;19;1;
+Neringa;Kopų g.;19;2;
+Nida;Kopų g.;17;1;
+Nida;Kopų g.;17;5;
+Nida;Kopų g.;17;2;
+Nida;Kopų g.;17;4;
+Nida;Kopų g.;17;3;
+Neringa;Kopų g.;17;1;
+Neringa;Kopų g.;17;3;
+Neringa;Kopų g.;17;4;
+Neringa;Kopų g.;17;2;
+Neringa;Kopų g.;17;5;
+Nida;Kopų g.;13;4;
+Nida;Kopų g.;13;2;
+Nida;Kopų g.;13;3;
+Nida;Kopų g.;13;1;
+Neringa;Kopų g.;13;2;
+Neringa;Kopų g.;13;1;
+Neringa;Kopų g.;13;3;
+Neringa;Kopų g.;13;4;
+Nida;Kopų g.;11;2;
+Nida;Kopų g.;11;1;
+Neringa;Kopų g.;11;2;
+Neringa;Kopų g.;11;1;
+Nida;Kopų g.;9;1;
+Nida;Kopų g.;9;1;
+Nida;Kopų g.;9;2;
+Nida;Kopų g.;9;2;
+Nida;Kopų g.;7;1;
+Nida;Kopų g.;7;2;
+Nida;Kopų g.;7;1;
+Nida;Kopų g.;7;2;
+Nida;Kopų g.;5;2;
+Nida;Kopų g.;5;1;
+Neringa;Kopų g.;5;1;
+Neringa;Kopų g.;5;2;
+Nida;Kopų g.;3;1;
+Nida;Kopų g.;3;2;
+Nida;Kopų g.;3;1;
+Nida;Kopų g.;3;2;
+Nida;Kopų g.;1;1;
+Nida;Kopų g.;1;2;
+Klaipėda;Kooperacijos g.;9;1;
+Klaipėda;Kooperacijos g.;9;4;
+Klaipėda;Kooperacijos g.;9;3;
+Klaipėda;Kooperacijos g.;9;2;
+Klaipėda;Kooperacijos g.;7;1;451
+Klaipėda;Kooperacijos g.;7;2;285
+Klaipėda;Kooperacijos g.;5;1;256
+Klaipėda;Kooperacijos g.;5;2;489
+Šilutė;Knygnešių g.;11;1;
+Šilutė;Knygnešių g.;9;1;38
+Šilutė;Knygnešių g.;9;2;16
+Šilutė;Knygnešių g.;8;2;38
+Šilutė;Knygnešių g.;8;1;38
+Šilutė;Knygnešių g.;6;2;
+Šilutė;Knygnešių g.;6;3;
+Šilutė;Knygnešių g.;6;1;
+Šilutė;Knygnešių g.;5;2;126
+Šilutė;Knygnešių g.;5;1;12
+Šilutė;Knygnešių g.;2;1;38
+Šilutė;Knygnešių g.;2;2;38
+Stoniškių k.;Klaipėdos g.;49;1;
+Stoniškių k.;Klaipėdos g.;43B;1;
+Stoniškių k.;Klaipėdos g.;43A;1;
+Stoniškių k.;Klaipėdos g.;42;1;25
+Sakūtėlių k.;Klaipėdos g.;41;1;
+Šilutė;Klaipėdos g.;33;1;
+Vilkyčių k.;Klaipėdos g.;31B;1;
+Vilkyčių k.;Klaipėdos g.;31B;2;
+Šilutė;Klaipėdos g.;29;1;
+Žemaičių Naumiestis;Klaipėdos g.;24;1;
+Sakūtėlių k.;Klaipėdos g.;22;1;
+Stoniškių k.;Klaipėdos g.;19;1;
+Stoniškių k.;Klaipėdos g.;19;2;
+Rukų k.;Klaipėdos g.;16;1;
+Rukų k.;Klaipėdos g.;16;2;
+Rukų k.;Klaipėdos g.;12;1;
+Dovilai;Klaipėdos g.;12;1;
+Šilutė;Klaipėdos g.;9;1;
+Pagėgiai;Klaipėdos g.;3;1;
+Šilutė;Klaipėdos g.;1a;2;
+Šilutė;Klaipėdos g.;1a;3;
+Šilutė;Klaipėdos g.;1a;1;
+Kiošiai;Kiošiai;1;1;
+Šilutė;Kęstučio g.;12;1;127
+Šilutė;Kęstučio g.;12;2;238
+Šilutė;Kęstučio g.;12;3;450
+Šilutė;Kęstučio g.;10;1;126
+Šilutė;Kęstučio g.;10;2;237
+Šilutė;Kęstučio g.;10;3;459
+Šilutė;Kęstučio g.;8;3;17
+Šilutė;Kęstučio g.;8;2;18
+Šilutė;Kęstučio g.;8;1;17
+Šilutė;Kęstučio g.;4;1;
+Šilutė;Kęstučio g.;3;1;
+Kerkutviečių k.;Kerkutviečių g.;12;1;
+Klaipėda;Kepėjų g.;12;2;Nėra
+Klaipėda;Kepėjų g.;12;5;Nėra
+Klaipėda;Kepėjų g.;12;4;Nėra
+Klaipėda;Kepėjų g.;12;3;Nėra
+Klaipėda;Kepėjų g.;12;1;Nėra
+Klaipėda;Kepėjų g.;11A;1;Nėra
+Klaipėda;Kepėjų g.;9;1;Nėra
+Klaipėda;Kepėjų g.;8A;1;Nėra
+Klaipėda;Kepėjų g.;8A;3;Nėra
+Klaipėda;Kepėjų g.;8A;2;Nėra
+Klaipėda;Kepėjų g.;8;2;Nėra
+Klaipėda;Kepėjų g.;8;1;6*5547
+Klaipėda;Kepėjų g.;8;3;Nėra
+Klaipėda;Kepėjų g.;7;1;Nėra
+Klaipėda;Kepėjų g.;6;1;Nėra
+Klaipėda;Kepėjų g.;5;2;Nėra
+Klaipėda;Kepėjų g.;5;1;Nėra
+Klaipėda;Kepėjų g.;4;1;raktas
+Klaipėda;Kepėjų g.;4;2;Nėra
+Pagėgiai;Kentrių k.;1;1;
+Sakūtėlių k.;Kebelių g.;9;1;
+Sakūtėlių k.;Kebelių g.;1;1;
+Klaipėda;Kauno g.;47;2;367
+Klaipėda;Kauno g.;47;6;136
+Klaipėda;Kauno g.;47;5;47
+Klaipėda;Kauno g.;47;1;150 * 5689
+Klaipėda;Kauno g.;47;3;368
+Klaipėda;Kauno g.;47;4;135
+Klaipėda;Kauno g.;41;5;360
+Klaipėda;Kauno g.;41;6;14
+Klaipėda;Kauno g.;41;4;78
+Klaipėda;Kauno g.;41;3;200*1234
+Klaipėda;Kauno g.;41;1;357
+Klaipėda;Kauno g.;41;2;200*1234
+Klaipėda;Kauno g.;39A;1;200*1234
+Klaipėda;Kauno g.;39;5;236
+Klaipėda;Kauno g.;39;4;257
+Klaipėda;Kauno g.;39;6;200*1234
+Klaipėda;Kauno g.;39;2;150
+Klaipėda;Kauno g.;39;1;280
+Klaipėda;Kauno g.;39;3;"200*1234; 10"
+Klaipėda;Kauno g.;35;2;c3579z
+Klaipėda;Kauno g.;35;6;246
+Klaipėda;Kauno g.;35;3;450
+Klaipėda;Kauno g.;35;4;14
+Klaipėda;Kauno g.;35;5;250
+Klaipėda;Kauno g.;35;1;268
+Klaipėda;Kauno g.;33;3;150*5689
+Klaipėda;Kauno g.;33;1;150*5689
+Klaipėda;Kauno g.;33;6;150*5689
+Klaipėda;Kauno g.;33;5;150*5689
+Klaipėda;Kauno g.;33;2;150*5689
+Klaipėda;Kauno g.;33;4;150*5689
+Klaipėda;Kauno g.;31;1;*0161616
+Klaipėda;Kauno g.;31;5;170
+Klaipėda;Kauno g.;31;2;200*1234
+Klaipėda;Kauno g.;31;4;200*1234
+Klaipėda;Kauno g.;31;6;200/1234
+Klaipėda;Kauno g.;31;3;126
+Klaipėda;Kauno g.;25;5;150*5689
+Klaipėda;Kauno g.;25;1;150*5689
+Klaipėda;Kauno g.;25;4;150*5689
+Klaipėda;Kauno g.;25;3;150*5689
+Klaipėda;Kauno g.;25;2;150*5689
+Klaipėda;Kauno g.;25;6;150*5689
+Klaipėda;Kauno g.;23A;3;150*5689
+Klaipėda;Kauno g.;23A;4;150*5689
+Klaipėda;Kauno g.;23A;1;150*5689
+Klaipėda;Kauno g.;23A;2;150*5689
+Klaipėda;Kauno g.;23;5;248
+Klaipėda;Kauno g.;23;6;249
+Klaipėda;Kauno g.;23;3;136
+Klaipėda;Kauno g.;23;2;50
+Klaipėda;Kauno g.;23;4;246
+Klaipėda;Kauno g.;23;1;71*1234
+Klaipėda;Kauno g.;21;1;20*2020
+Klaipėda;Kauno g.;21;2;
+Klaipėda;Kauno g.;15;5;890
+Klaipėda;Kauno g.;15;4;267
+Klaipėda;Kauno g.;15;3;247(456)
+Klaipėda;Kauno g.;15;1;137
+Klaipėda;Kauno g.;15;2;258
+Klaipėda;Kauno g.;15;6;199*4621
+Klaipėda;Kauno g.;3;6;199*4621
+Klaipėda;Kauno g.;3;3;199*4621
+Klaipėda;Kauno g.;3;5;199*4621
+Klaipėda;Kauno g.;3;2;199*4621
+Klaipėda;Kauno g.;3;7;199*4621
+Klaipėda;Kauno g.;3;1;199*4621
+Klaipėda;Kauno g.;3;4;199*4621
+Klaipėda;Kauno g.;3;8;199*4621
+Šilutė;Katalikų bažnyčios g.;2a;1;
+Šilutė;Katalikų bažnyčios g.;2;1;
+Juknaičių k.;Kaštonų g.;3;2;
+Juknaičių k.;Kaštonų g.;3;1;
+Karūžiškė II;Karūžiškė II k.;3;1;
+Karūžiškė II;Karūžiškė II k.;3;1;
+Šilutė;Karklų g.;13;1;
+Klaipėda;Karklų g.;8;2;458
+Klaipėda;Karklų g.;8;1;67
+Karklės k.;Karklininkų g.;8;1;
+Karklės k.;Karklininkų g.;6;1;
+Klaipėda;Karališkių g.;33;1;
+Klaipėda;Karališkių g.;31;1;
+Klaipėda;Karališkių g.;29;1;
+Klaipėda;Karališkių g.;25;1;
+Klaipėda;Karališkių g.;21;1;
+Klaipėda;Karališkių g.;19;1;
+Klaipėda;Karališkių g.;18B;1;
+Klaipėda;Karališkių g.;18A;1;
+Klaipėda;Karališkių g.;18;1;
+Klaipėda;Karališkių g.;17;1;
+Klaipėda;Karališkių g.;16B;1;
+Klaipėda;Karališkių g.;16A;1;
+Klaipėda;Karališkių g.;16;1;
+Klaipėda;Karališkių g.;15;1;
+Klaipėda;Karališkių g.;14B;1;
+Klaipėda;Karališkių g.;14A;1;
+Klaipėda;Karališkių g.;14;1;
+Klaipėda;Karališkių g.;13;1;
+Klaipėda;Karališkių g.;12;1;
+Klaipėda;Karališkių g. 12;K9;1;
+Klaipėda;Karališkių g. 12;K8;1;
+Klaipėda;Karališkių g. 12;K7;1;
+Klaipėda;Karališkių g. 12;K6;1;
+Klaipėda;Karališkių g. 12;K5;1;
+Klaipėda;Karališkių g. 12;K4;1;
+Klaipėda;Karališkių g. 12;K3;1;
+Klaipėda;Karališkių g. 12;K2;1;
+Klaipėda;Karališkių g. 12;K16;1;
+Klaipėda;Karališkių g. 12;K15;1;
+Klaipėda;Karališkių g. 12;K14;1;
+Klaipėda;Karališkių g. 12;K13;1;
+Klaipėda;Karališkių g. 12;K12;1;
+Klaipėda;Karališkių g. 12;K11;1;
+Klaipėda;Karališkių g. 12;K10;1;
+Klaipėda;Karališkių g. 12;K1;1;
+Klaipėda;Karališkių g.;11;1;
+Klaipėda;Karališkių g.;10;1;
+Klaipėda;Karališkių g. 10;K9;1;
+Klaipėda;Karališkių g. 10;K8;1;
+Klaipėda;Karališkių g. 10;K7;1;
+Klaipėda;Karališkių g. 10;K6;1;
+Klaipėda;Karališkių g. 10;K5;1;
+Klaipėda;Karališkių g. 10;K4;1;
+Klaipėda;Karališkių g. 10;K3;1;
+Klaipėda;Karališkių g. 10;K21;1;
+Klaipėda;Karališkių g. 10;K20;1;
+Klaipėda;Karališkių g. 10;K2;1;
+Klaipėda;Karališkių g. 10;K19;1;
+Klaipėda;Karališkių g. 10;K18;1;
+Klaipėda;Karališkių g. 10;K17;1;
+Klaipėda;Karališkių g. 10;K16;1;
+Klaipėda;Karališkių g. 10;K15;1;
+Klaipėda;Karališkių g. 10;K14;1;
+Klaipėda;Karališkių g. 10;K13;1;
+Klaipėda;Karališkių g. 10;K12;1;
+Klaipėda;Karališkių g. 10;K11;1;
+Klaipėda;Karališkių g. 10;K10;1;
+Klaipėda;Karališkių g. 10;K1;1;
+Klaipėda;Karališkių g.;9;1;
+Klaipėda;Karališkių g.;8;1;
+Klaipėda;Karališkių g. 8;K9;1;
+Klaipėda;Karališkių g. 8;K8;1;
+Klaipėda;Karališkių g. 8;K6;1;
+Klaipėda;Karališkių g. 8;K5;1;
+Klaipėda;Karališkių g. 8;K4;1;
+Klaipėda;Karališkių g. 8;K3;1;
+Klaipėda;Karališkių g. 8;K2;1;
+Klaipėda;Karališkių g. 8;K11;1;
+Klaipėda;Karališkių g. 8;K10;1;
+Klaipėda;Karališkių g. 8;K1;1;
+Klaipėda;Karališkių g.;7;1;
+Klaipėda;Karališkių g.;6K5;1;
+Klaipėda;Karališkių g.;6K4;1;
+Klaipėda;Karališkių g.;6K3;1;
+Klaipėda;Karališkių g.;6K2;1;
+Klaipėda;Karališkių g.;6K1;1;
+Klaipėda;Karališkių g.;6CK5;1;
+Klaipėda;Karališkių g.;6CK3;1;
+Klaipėda;Karališkių g.;6CK2;1;
+Klaipėda;Karališkių g.;6CK1;1;
+Klaipėda;Karališkių g.;6C4K;1;
+Klaipėda;Karališkių g.;6C;1;
+Klaipėda;Karališkių g.;6;1;
+Klaipėda;Karališkių g.;2B;1;
+Klaipėda;Karališkių g.;2A;1;
+Klaipėda;Karališkių g.;2;1;15*3859
+Klaipėda;Karališkių g.;1A;1;
+Klaipėda;Karališkių g.;1;1;
+Pakamonių k.;Kamanos g.;4;1;
+Klaipėda;Kalnupės g.;25;1;61*1234
+Klaipėda;Kalnupės g.;25;2;136
+Klaipėda;Kalnupės g.;25;3;238
+Klaipėda;Kalnupės g.;11A;2;340
+Klaipėda;Kalnupės g.;11A;3;49
+Klaipėda;Kalnupės g.;11A;1;191*6885
+Klaipėda;Kalnupės g.;9;4;150*5689
+Klaipėda;Kalnupės g.;9;1;150*5689
+Klaipėda;Kalnupės g.;9;2;150*5689
+Klaipėda;Kalnupės g.;9;3;150*5689
+Klaipėda;Kalnupės g.;7;1;14
+Klaipėda;Kalnupės g.;7;2;185
+Žemaičių Naumiesčio sen.;Kalnujų k.;7;1;
+Juodkrantė;Kalno g.;36;1;Nera
+Juodkrantė;Kalno g.;4A;4;
+Juodkrantė;Kalno g.;4A;2;
+Juodkrantė;Kalno g.;4A;4;
+Juodkrantė;Kalno g.;4A;2;
+Juodkrantė;Kalno g.;4A;1;
+Juodkrantė;Kalno g.;4A;1;
+Juodkrantė;Kalno g.;4A;3;
+Juodkrantė;Kalno g.;4A;3;
+Juodkrantė;Kalno g.;4;1;
+Juodkrantė;Kalno g.;2;1;
+Šilutė;K. Kalinausko g.;11;1;236
+Kvėdarna;K. Jauniaus g.;7;1;nėra
+Kvėdarna;K. Jauniaus g.;5D;1;
+Kvėdarna;K. Jauniaus g.;5C;1;38
+Kvėdarna;K. Jauniaus g.;5C;2;38
+Kvėdarna;K. Jauniaus g.;5B;2;38
+Kvėdarna;K. Jauniaus g.;5B;1;
+Kvėdarna;K. Jauniaus g.;5A;1;
+Kvėdarna;K. Jauniaus g.;5A;2;38
+Kvėdarna;K. Jauniaus g.;5A;3;38
+Tauragė;K. Donelaičio g.;64;1;210*0640
+Tauragė;K. Donelaičio g.;64;2;210*0640
+Klaipėda;K. Donelaičio g.;16;1;10*7918
+Klaipėda;K. Donelaičio g.;14;1;8/8454
+Rusnė;K. Donelaičio g.;9;1;
+Rusnė;K. Donelaičio g.;9;2;
+Panemunė;K. Donelaičio g.;8;1;
+Rusnė;K. Donelaičio g.;7;1;
+Rusnė;K. Donelaičio g.;7;2;
+Rusnė;K. Donelaičio g.;7;3;
+Panemunė;K. Donelaičio g.;7;1;
+Rusnė;K. Donelaičio g.;5;1;
+Rusnė;K. Donelaičio g.;5;3;
+Rusnė;K. Donelaičio g.;5;2;
+Rusnė;K. Donelaičio g.;2B;1;
+Klaipėda;K. Donelaičio a.;5B;1;3 raktas 1380
+Pajūralis;Jūros g.;42;2;
+Pajūralis;Jūros g.;42;1;
+Opstainio k.;Jūros g.;14;1;
+Drobūkščiai;Jūros g.;8;1;
+Mociškių k.;Jūros g.;5;1;
+Opstainio k.;Jūros g.;1;1;
+Palanga;Jūratės g.;17;1;1*1234
+Palanga;Jūratės g.;15;1;8raktas7611
+Šiauduva;Jono Gudauskio g.;2;1;
+Klaipėda;Jono g.;10;2;Nėra
+Klaipėda;Jono g.;10;1;raktas
+Klaipėda;Jono g.;8;1;Nėra
+Klaipėda;Jono g.;8;2;Nėra
+Klaipėda;Jono g.;6;1;raktas
+Klaipėda;Jono g.;6;2;Nėra
+Klaipėda;Jono g.;6;3;Nėra
+Klaipėda;Jono g.;5;1;Raktas
+Klaipėda;Jono g.;5;2;Nėra
+Klaipėda;Jono g.;4;1;raktas
+Klaipėda;Jono g.;4;2;Nėra
+Klaipėda;Jono g.;2;1;raktas
+Gardamo sen.;Jokūbiškės k.;2;1;
+Gardamo sen.;Jokūbiškės k.;2;2;
+Vilkyškiai;Johaneso Bobrovskio g.;63;1;
+Vilkyškiai;Johaneso Bobrovskio g.;59;1;
+Vilkyškiai;Johaneso Bobrovskio g.;38;1;
+Vilkyškiai;Johaneso Bobrovskio g.;29;1;
+Vilkyškiai;Johaneso Bobrovskio g.;26;1;
+Vilkyškiai;Johaneso Bobrovskio g.;22;1;
+Vilkyškiai;Johaneso Bobrovskio g.;21;1;
+Vilkyškiai;Johaneso Bobrovskio g.;18;1;
+Vilkyškiai;Johaneso Bobrovskio g.;16;1;
+Vilkyškiai;Johaneso Bobrovskio g.;15;1;
+Vilkyškiai;Johaneso Bobrovskio g.;14;1;
+Vilkyškiai;Johaneso Bobrovskio g.;13;1;
+Vilkyškiai;Johaneso Bobrovskio g.;12;2;
+Vilkyškiai;Johaneso Bobrovskio g.;12;1;
+Lumpėnų k.;Javų g.;15;2;
+Lumpėnų k.;Javų g.;15;1;
+Šilutė;Jaunimo al.;10;4;2012
+Šilutė;Jaunimo al.;10;2;1962
+Šilutė;Jaunimo al.;10;3;1973
+Šilutė;Jaunimo al.;10;1;3541
+Šilutė;Jaunimo al.;8;1;
+Šilutė;Jaunimo al.;6;2;40
+Šilutė;Jaunimo al.;6;4;17
+Šilutė;Jaunimo al.;6;1;24
+Šilutė;Jaunimo al.;6;3;248
+Šilutė;Jaunimo al.;5;5;38
+Šilutė;Jaunimo al.;5;4;38
+Šilutė;Jaunimo al.;5;2;38
+Šilutė;Jaunimo al.;5;3;38
+Šilutė;Jaunimo al.;5;6;38
+Šilutė;Jaunimo al.;5;1;38
+Šilutė;Jaunimo al.;4;1;
+Šilutė;Jaunimo al.;4;3;
+Šilutė;Jaunimo al.;4;5;
+Šilutė;Jaunimo al.;4;6;
+Šilutė;Jaunimo al.;4;2;38
+Šilutė;Jaunimo al.;4;4;
+Šilutė;Jaunimo al.;3;2;
+Šilutė;Jaunimo al.;3;4;235
+Šilutė;Jaunimo al.;3;3;10
+Šilutė;Jaunimo al.;3;1;2015*
+Šilutė;Jaunimo al.;2;6;
+Šilutė;Jaunimo al.;2;4;
+Šilutė;Jaunimo al.;2;5;
+Šilutė;Jaunimo al.;2;1;38
+Šilutė;Jaunimo al.;2;2;38
+Šilutė;Jaunimo al.;2;3;38
+Klaipėda;J. Zembrickio g.;10;1;
+Klaipėda;J. Zembrickio g.;9;1;38
+Klaipėda;J. Zembrickio g.;5;1;
+Klaipėda;J. Zembrickio g.;3;1;459
+Tauragė;J. Tumo-Vaižganto g.;129A;2;Čipsas (90*9090)
+Tauragė;J. Tumo-Vaižganto g.;129A;3;Čipsas (90*9090)
+Tauragė;J. Tumo-Vaižganto g.;129A;1;Čipsas (90*9090)
+Tauragė;J. Tumo-Vaižganto g.;129;2;
+Tauragė;J. Tumo-Vaižganto g.;129;1;
+Palanga;J. Simpsono g.;16;1;
+Girdiškė;J. Mockaičio g.;2;1;
+Klaipėda;J. Karoso g.;21;6;
+Klaipėda;J. Karoso g.;21;5;
+Klaipėda;J. Karoso g.;21;3;200*1590
+Klaipėda;J. Karoso g.;21;2;61*1234
+Klaipėda;J. Karoso g.;21;4;
+Klaipėda;J. Karoso g.;21;1;"61*1234; 469"
+Klaipėda;J. Karoso g.;21;7;
+Klaipėda;J. Karoso g.;20;3;
+Klaipėda;J. Karoso g.;20;5;
+Klaipėda;J. Karoso g.;20;10;
+Klaipėda;J. Karoso g.;20;11;
+Klaipėda;J. Karoso g.;20;1;457
+Klaipėda;J. Karoso g.;20;2;247
+Klaipėda;J. Karoso g.;20;6;
+Klaipėda;J. Karoso g.;20;4;
+Klaipėda;J. Karoso g.;20;9;
+Klaipėda;J. Karoso g.;20;7;
+Klaipėda;J. Karoso g.;20;8;
+Klaipėda;J. Karoso g.;18;4;
+Klaipėda;J. Karoso g.;18;2;200*1234
+Klaipėda;J. Karoso g.;18;1;100*1000
+Klaipėda;J. Karoso g.;18;3;
+Klaipėda;J. Karoso g.;16;2;150*5689
+Klaipėda;J. Karoso g.;16;4;
+Klaipėda;J. Karoso g.;16;5;
+Klaipėda;J. Karoso g.;16;1;150*5689
+Klaipėda;J. Karoso g.;16;3;
+Klaipėda;J. Karoso g.;15;2;
+Klaipėda;J. Karoso g.;15;3;
+Klaipėda;J. Karoso g.;15;1;
+Klaipėda;J. Karoso g.;14;1;3*2845
+Klaipėda;J. Karoso g.;14;5;
+Klaipėda;J. Karoso g.;14;2;
+Klaipėda;J. Karoso g.;14;3;
+Klaipėda;J. Karoso g.;14;4;
+Klaipėda;J. Karoso g.;11;1;230
+Klaipėda;J. Karoso g.;10;2;
+Klaipėda;J. Karoso g.;10;1;200*1234
+Klaipėda;J. Karoso g.;3;2;nėra
+Klaipėda;J. Karoso g.;3;1;nėra
+Klaipėda;J. Karoso g.;3;3;
+Klaipėda;J. Karoso g.;3;4;
+Šilalė;J. Basanavičiaus g.;23;1;nėra
+Šilalė;J. Basanavičiaus g.;20;2;
+Šilalė;J. Basanavičiaus g.;20;1;
+Šilalė;J. Basanavičiaus g.;19;1;
+Šilalė;J. Basanavičiaus g.;18;2;
+Šilalė;J. Basanavičiaus g.;18;1;
+Šilalė;J. Basanavičiaus g.;17;1;
+Šilalė;J. Basanavičiaus g.;16;2;38
+Šilalė;J. Basanavičiaus g.;16;1;359
+Šilalė;J. Basanavičiaus g.;11;1;
+Šilalė;J. Basanavičiaus g.;8a;1;
+Šilalė;J. Basanavičiaus g.;8;1;38
+Šilalė;J. Basanavičiaus g.;7;1;
+Šilalė;J. Basanavičiaus g.;6;1;
+Šilalė;J. Basanavičiaus g.;4;1;
+Neringa;Ievos kalno g.;28;1;
+Neringa;Ievos kalno g.;24;1;
+Neringa;Ievos kalno g.;20;1;
+Neringa;Ievos kalno g.;20;1;
+Neringa;Ievos kalno g.;18;1;
+Neringa;Ievos kalno g.;18;1;
+Neringa;Ievos kalno g.;16;1;
+Neringa;Ievos kalno g.;16;1;
+Neringa;Ievos kalno g.;14A;1;
+Neringa;Ievos kalno g.;14;1;
+Neringa;Ievos kalno g.;7;1;
+Neringa;Ievos kalno g.;4;1;
+Neringa;Ievos kalno g.;4;1;
+Neringa;Ievos kalno g.;4;3;
+Neringa;Ievos kalno g.;4;2;
+Neringa;Ievos kalno g.;4;2;
+Neringa;Ievos kalno g.;2;2;
+Neringa;Ievos kalno g.;2;1;
+Neringa;Ievos kalno g.;2;3;
+Neringa;Ievos kalno g.;1;3;
+Neringa;Ievos kalno g.;1;1;
+Neringa;Ievos kalno g.;1;2;
+Neringa;Ievos kalno g.;1;1;
+Neringa;Ievos kalno g.;1;2;
+Klaipėda;I. Simonaitytės g.;32;3;181*0349
+Klaipėda;I. Simonaitytės g.;32;2;187*5073
+Klaipėda;I. Simonaitytės g.;32;4;
+Klaipėda;I. Simonaitytės g.;32;1;180*0034
+Klaipėda;I. Simonaitytės g.;30;2;192*0349
+Klaipėda;I. Simonaitytės g.;30;3;193*0732
+Klaipėda;I. Simonaitytės g.;30;1;"570; 150*5689"
+Klaipėda;I. Simonaitytės g.;30;4;150*5689
+Klaipėda;I. Simonaitytės g.;28;2;177*2711
+Klaipėda;I. Simonaitytės g.;28;3;170*5530
+Klaipėda;I. Simonaitytės g.;28;4;177*2711
+Klaipėda;I. Simonaitytės g.;28;1;177*2711
+Klaipėda;I. Simonaitytės g.;23;4;177*2711
+Klaipėda;I. Simonaitytės g.;23;7;177*2711
+Klaipėda;I. Simonaitytės g.;23;2;177*2711
+Klaipėda;I. Simonaitytės g.;23;3;177*2711
+Klaipėda;I. Simonaitytės g.;23;5;177*2711
+Klaipėda;I. Simonaitytės g.;23;1;177*2711
+Klaipėda;I. Simonaitytės g.;23;6;177*2711
+Klaipėda;I. Simonaitytės g.;22;1;159*4215
+Klaipėda;I. Simonaitytės g.;22;4;159*4215
+Klaipėda;I. Simonaitytės g.;22;3;159*4215
+Klaipėda;I. Simonaitytės g.;22;5;159*4215
+Klaipėda;I. Simonaitytės g.;22;2;159*4215
+Klaipėda;I. Simonaitytės g.;18;4;130*7831
+Klaipėda;I. Simonaitytės g.;18;3;130*7831
+Klaipėda;I. Simonaitytės g.;18;1;130*7831
+Klaipėda;I. Simonaitytės g.;18;6;130*7831
+Klaipėda;I. Simonaitytės g.;18;2;130*7831
+Klaipėda;I. Simonaitytės g.;18;5;130*7831
+Klaipėda;I. Simonaitytės g.;5;1;150*4671
+Klaipėda;I. Simonaitytės g.;5;2;150*4671
+Klaipėda;I. Simonaitytės g.;5;4;149
+Klaipėda;I. Simonaitytės g.;5;3;38
+Klaipėda;I. Simonaitytės g.;1;2;159*4215
+Klaipėda;I. Simonaitytės g.;1;1;159*4215
+Klaipėda;I. Simonaitytės g.;1;4;159*4215
+Klaipėda;I. Simonaitytės g.;1;3;159*4215
+Klaipėda;I. Kanto g.;18;1;
+Klaipėda;I. Kanto g.;16;1;
+Šilutė;Hermano Zudermano g.;9;3;38
+Šilutė;Hermano Zudermano g.;9;2;2580
+Šilutė;Hermano Zudermano g.;9;1;4593
+Šilutė;Hermano Zudermano g.;7;2;2010
+Šilutė;Hermano Zudermano g.;7;1;2010
+Macikų k.;H. Zudermano g.;37;1;
+Macikų k.;H. Zudermano g.;6a;1;
+Macikų k.;H. Zudermano g.;6;1;
+Klaipėda;H. Manto g.;62;3;RAKINAMA
+Klaipėda;H. Manto g.;62;2;RAKINAMA
+Klaipėda;H. Manto g.;62;1;RAKINAMA
+Klaipėda;H. Manto g.;54A;1;
+Klaipėda;H. Manto g.;54;1;nėra
+Klaipėda;H. Manto g.;46;7;
+Klaipėda;H. Manto g.;46;3;38
+Klaipėda;H. Manto g.;46;6;
+Klaipėda;H. Manto g.;46;2;379
+Klaipėda;H. Manto g.;46;1;38
+Klaipėda;H. Manto g.;46;9;
+Klaipėda;H. Manto g.;46;8;
+Klaipėda;H. Manto g.;46;11;
+Klaipėda;H. Manto g.;46;12;
+Klaipėda;H. Manto g.;46;4;
+Klaipėda;H. Manto g.;46;10;
+Klaipėda;H. Manto g.;46;5;
+Klaipėda;H. Manto g.;44;1;
+Klaipėda;H. Manto g.;42;1;RAKINAMA
+Klaipėda;H. Manto g.;42;3;
+Klaipėda;H. Manto g.;42;2;
+Klaipėda;H. Manto g.;42;4;
+Klaipėda;H. Manto g.;36;1;
+Klaipėda;H. Manto g.;30;4;
+Klaipėda;H. Manto g.;30;5;
+Klaipėda;H. Manto g.;30;2;
+Klaipėda;H. Manto g.;30;3;
+Klaipėda;H. Manto g.;30;1;128
+Klaipėda;H. Manto g.;18;4;
+Klaipėda;H. Manto g.;18;2;8*9932
+Klaipėda;H. Manto g.;18;1;1540#
+Klaipėda;H. Manto g.;18;3;
+Klaipėda;H. Manto g.;18;5;
+Klaipėda;H. Manto g.;7;1;Čipas
+Klaipėda;H. Manto g.;7;5;
+Klaipėda;H. Manto g.;7;4;Čipas
+Klaipėda;H. Manto g.;7;2;Čipas
+Klaipėda;H. Manto g.;7;3;Čipas
+Klaipėda;H. Manto g.;4;4;
+Klaipėda;H. Manto g.;4;8;
+Klaipėda;H. Manto g.;4;1;
+Klaipėda;H. Manto g.;4;6;
+Klaipėda;H. Manto g.;4;3;
+Klaipėda;H. Manto g.;4;5;
+Klaipėda;H. Manto g.;4;2;
+Klaipėda;H. Manto g.;4;7;
+Leitgirių k.;Gudobelių g.;2;1;
+Leitgirių k.;Gudobelių g.;2;2;
+Saugų sen.;Grumblių k.;3;1;
+Šilutė;Gluosnių g.;9;1;
+Klaipėda;Gluosnių g.;6;1;
+Šilutė;Gluosnių g.;5a;2;nėra
+Šilutė;Gluosnių g.;5a;6;
+Šilutė;Gluosnių g.;5a;4;nėra
+Šilutė;Gluosnių g.;5a;1;nėra
+Šilutė;Gluosnių g.;5a;5;38
+Šilutė;Gluosnių g.;5a;3;38
+Klaipėda;Giraitės g.;4;1;
+Klaipėda;Giraitės g.;4;2;
+Neringa;Gintaro Įlankos g.;14A;1;
+Neringa;Gintaro Įlankos g.;14A;1;
+Neringa;Gintaro Įlankos g.;14;1;
+Neringa;Gintaro Įlankos g.;14;1;
+Neringa;Gintaro Įlankos g.;12;1;
+Neringa;Gintaro Įlankos g.;12;1;
+Neringa;Gintaro Įlankos g.;10;3;
+Neringa;Gintaro Įlankos g.;10;2;
+Neringa;Gintaro Įlankos g.;10;4;
+Neringa;Gintaro Įlankos g.;10;1;
+Neringa;Gintaro Įlankos g.;10;5;
+Palanga;Gintaro g.;33;1;
+Klaipėda;Gėlių g.;20;1;RAKINAMA
+Pagėgiai;Geležinkelio g.;26A;1;
+Pagėgiai;Geležinkelio g.;20A;1;
+Šilutė;Geležinkelio g.;11;1;278/238
+Šilutė;Geležinkelio g.;9;1;nėra
+Šilutė;Geležinkelio g.;9;2;nėra
+Šilutė;Geležinkelio g.;7;3;Nėra
+Šilutė;Geležinkelio g.;7;2;38
+Šilutė;Geležinkelio g.;7;1;38
+Šilutė;Geležinkelio g.;6;1;Nėra
+Šilutė;Geležinkelio g.;5;1;
+Šilutė;Geležinkelio g.;5;3;Nėra
+Šilutė;Geležinkelio g.;5;2;Nėra
+Tauragė;Gedimino g.;37;2;1983#
+Tauragė;Gedimino g.;37;1;358
+Tauragė;Gedimino g.;24;1;24
+Tauragė;Gedimino g.;24;2;38
+Tauragė;Gedimino g.;24;3;579
+Tauragė;Gedimino g.;24;4;13
+Tūbinės I;Gardavos g.;12;1;
+Palanga;Ganyklų g.;12;1;
+Palanga;Ganyklų g.;10A;2;1357#
+Palanga;Ganyklų g.;10A;1;1357#
+Palanga;Ganyklų g.;10;2;20468#
+Palanga;Ganyklų g.;10;1;20468#
+Palanga;Ganyklų g.;8C;2;2580
+Palanga;Ganyklų g.;8C;1;2580
+Pagrynių k.;Gamtos g.;48;1;
+Neringa;G. D. Kuverto g.;13A;3;
+Neringa;G. D. Kuverto g.;13A;1;
+Neringa;G. D. Kuverto g.;13A;9;
+Neringa;G. D. Kuverto g.;13A;11;
+Neringa;G. D. Kuverto g.;13A;4;
+Neringa;G. D. Kuverto g.;13A;8;
+Neringa;G. D. Kuverto g.;13A;14;
+Neringa;G. D. Kuverto g.;13A;6;
+Neringa;G. D. Kuverto g.;13A;12;
+Neringa;G. D. Kuverto g.;13A;10;
+Neringa;G. D. Kuverto g.;13A;2;
+Neringa;G. D. Kuverto g.;13A;5;
+Neringa;G. D. Kuverto g.;13A;13;
+Neringa;G. D. Kuverto g.;13A;7;
+Neringa;G. D. Kuverto g.;5;1;
+Neringa;G. D. Kuverto g.;1A;1;
+Neringa;G. D. Kuverto g.;1A;4;
+Neringa;G. D. Kuverto g.;1A;2;
+Neringa;G. D. Kuverto g.;1A;3;
+Neringa;G. D. Kuverto g.;1A;3;
+Neringa;G. D. Kuverto g.;1A;1;
+Neringa;G. D. Kuverto g.;1A;2;
+Neringa;G. D. Kuverto g.;1A;4;
+Neringa;G. D. Kuverto g.;1;1;
+Neringa;G. D. Kuverto g.;1;2;
+Neringa;G. D. Kuverto g.;1;3;
+Gardamo sen.;Eidaičių k.;3;1;
+Šilutė;Eglių g.;3;1;
+Būbliškės k.;Dvaro g.;10;1;
+Šilalė;Dvaro g.;7;2;
+Šilalė;Dvaro g.;7;1;
+Šilgalių k.;Dvaro g.;2;1;
+Sauslaukis;Dvaro g.;1;1;nėra
+Svaraitkiemio k.;Dvarelio g.;9;1;
+Svaraitkiemio k.;Dvarelio g.;3;1;
+Svaraitkiemio k.;Dvarelio g.;1;1;
+Traksedžių k.;Durpyno g.;1;1;
+Juknaičių sen.;Domaičių k.;1;2;
+Juknaičių sen.;Domaičių k.;1;1;
+Šilutė;Dirvų g.;11;1;
+Bijotai;Dionizo Poškos g.;4;1;
+Pavilkių k.;Dinkių g.;6a;1;
+Šiauduva;Dievyčio g.;14;1;nėra
+Šiauduva;Dievyčio g.;14;2;nėra
+Šiauduva;Dievyčio g.;12;2;
+Klaipėda;Didžioji Vandens g.;21;1;Nėra
+Klaipėda;Didžioji Vandens g.;18;2;Nėra
+Klaipėda;Didžioji Vandens g.;18;3;
+Klaipėda;Didžioji Vandens g.;18;1;258
+Klaipėda;Didžioji Vandens g.;14A;1;Rakinama
+Klaipėda;Didžioji Vandens g.;14A;3;7*6999
+Klaipėda;Didžioji Vandens g.;14A;2;7*6999
+Klaipėda;Didžioji Vandens g.;14;1;Nėra
+Klaipėda;Didžioji Vandens g.;13;1;Nėra
+Klaipėda;Didžioji Vandens g.;12;2;Nėra
+Klaipėda;Didžioji Vandens g.;12;1;Nėra
+Klaipėda;Didžioji Vandens g.;7;2;7*0745
+Klaipėda;Didžioji Vandens g.;7;1;7*0745
+Klaipėda;Debreceno g.;96;2;150*5689
+Klaipėda;Debreceno g.;96;1;150*5689
+Klaipėda;Debreceno g.;92;2;93*0473
+Klaipėda;Debreceno g.;92;1;93*0473
+Klaipėda;Debreceno g.;92;4;16
+Klaipėda;Debreceno g.;92;3;38
+Klaipėda;Debreceno g.;92;5;49
+Klaipėda;Debreceno g.;92;6;93*0473
+Klaipėda;Debreceno g.;90;1;150*5689
+Klaipėda;Debreceno g.;90;2;150*5689
+Klaipėda;Debreceno g.;82;1;1/ 101*4429
+Klaipėda;Debreceno g.;82;2;101*4429
+Klaipėda;Debreceno g.;76;3;119*1919
+Klaipėda;Debreceno g.;76;1;369
+Klaipėda;Debreceno g.;76;2;38
+Klaipėda;Debreceno g.;76;4;119*1919
+Klaipėda;Debreceno g.;74;2;197*5472
+Klaipėda;Debreceno g.;74;1;197*5472
+Klaipėda;Debreceno g.;72;3;279
+Klaipėda;Debreceno g.;72;4;74*0311
+Klaipėda;Debreceno g.;72;1;457
+Klaipėda;Debreceno g.;72;2;136
+Klaipėda;Debreceno g.;66;1;155*3379
+Klaipėda;Debreceno g.;66;2;155*3379
+Klaipėda;Debreceno g.;64;4;89*4388
+Klaipėda;Debreceno g.;64;6;189*4388
+Klaipėda;Debreceno g.;64;5;89*4388
+Klaipėda;Debreceno g.;64;3;169
+Klaipėda;Debreceno g.;64;2;89*4388
+Klaipėda;Debreceno g.;64;1;89*4388
+Klaipėda;Debreceno g.;62;4;38
+Klaipėda;Debreceno g.;62;2;100*1234
+Klaipėda;Debreceno g.;62;1;100*1234
+Klaipėda;Debreceno g.;62;3;100*1234
+Klaipėda;Debreceno g.;60;1;117*9281
+Klaipėda;Debreceno g.;60;2;117*9281
+Klaipėda;Debreceno g.;58;3;177*1051
+Klaipėda;Debreceno g.;58;4;289
+Klaipėda;Debreceno g.;58;1;177*0051
+Klaipėda;Debreceno g.;58;2;249
+Klaipėda;Debreceno g.;56;3;155*3379
+Klaipėda;Debreceno g.;56;6;155*3379
+Klaipėda;Debreceno g.;56;2;38
+Klaipėda;Debreceno g.;56;4;369
+Klaipėda;Debreceno g.;56;5;155*3379
+Klaipėda;Debreceno g.;56;1;155*3379
+Klaipėda;Debreceno g.;46;6;119*1919
+Klaipėda;Debreceno g.;46;3;128
+Klaipėda;Debreceno g.;46;2;458
+Klaipėda;Debreceno g.;46;1;119*1919
+Klaipėda;Debreceno g.;46;4;119*1919
+Klaipėda;Debreceno g.;46;5;119*1919
+Klaipėda;Debreceno g.;44;1;359
+Klaipėda;Debreceno g.;44;4;162*5731
+Klaipėda;Debreceno g.;44;3;162*5731
+Klaipėda;Debreceno g.;44;4;162*5731
+Klaipėda;Debreceno g.;44;2;162*5731
+Klaipėda;Debreceno g.;44;5;38
+Klaipėda;Debreceno g.;44;5;38
+Klaipėda;Debreceno g.;44;1;162*5731
+Klaipėda;Debreceno g.;44;8;570
+Klaipėda;Debreceno g.;44;7;162*5731
+Klaipėda;Debreceno g.;44;8;570
+Klaipėda;Debreceno g.;44;7;162*5731
+Klaipėda;Debreceno g.;44;1;162*5731
+Klaipėda;Debreceno g.;44;6;162*5737
+Klaipėda;Debreceno g.;44;2;162*5731
+Klaipėda;Debreceno g.;44;3;162*5731
+Klaipėda;Debreceno g.;44;6;162*5731
+Klaipėda;Debreceno g.;42;4;162*5731
+Klaipėda;Debreceno g.;42;5;
+Klaipėda;Debreceno g.;42;2;162*5731
+Klaipėda;Debreceno g.;42;3;49
+Klaipėda;Debreceno g.;42;1;1560
+Klaipėda;Debreceno g.;40;3;49
+Klaipėda;Debreceno g.;40;5;162*5731
+Klaipėda;Debreceno g.;40;4;162*5731
+Klaipėda;Debreceno g.;40;6;162*5731
+Klaipėda;Debreceno g.;40;1;167
+Klaipėda;Debreceno g.;40;2;162*5731
+Klaipėda;Debreceno g.;36;5;148
+Klaipėda;Debreceno g.;36;4;67
+Klaipėda;Debreceno g.;36;3;173*1720
+Klaipėda;Debreceno g.;36;2;173*1720
+Klaipėda;Debreceno g.;36;1;173*1720
+Klaipėda;Debreceno g.;36;6;237
+Klaipėda;Debreceno g.;34;6;27
+Klaipėda;Debreceno g.;34;1;120*6043
+Klaipėda;Debreceno g.;34;3;120*6043
+Klaipėda;Debreceno g.;34;5;120*6043
+Klaipėda;Debreceno g.;34;2;120*6043
+Klaipėda;Debreceno g.;34;4;128
+Klaipėda;Debreceno g.;32;1;87*0277
+Klaipėda;Debreceno g.;32;2;87*0277
+Klaipėda;Debreceno g.;30;4;38
+Klaipėda;Debreceno g.;30;1;130*9954
+Klaipėda;Debreceno g.;30;2;24
+Klaipėda;Debreceno g.;30;5;
+Klaipėda;Debreceno g.;30;3;130*9954
+Klaipėda;Debreceno g.;28;3;168*0192
+Klaipėda;Debreceno g.;28;1;168*0192
+Klaipėda;Debreceno g.;28;2;168*0192
+Klaipėda;Debreceno g.;28;4;168*0192
+Klaipėda;Debreceno g.;20A;2;
+Klaipėda;Debreceno g.;20A;1;20*2020
+Klaipėda;Debreceno g.;20;1;358
+Klaipėda;Debreceno g.;20;6;197*5472
+Klaipėda;Debreceno g.;20;2;136
+Klaipėda;Debreceno g.;20;8;
+Klaipėda;Debreceno g.;20;3;197*5472
+Klaipėda;Debreceno g.;20;4;197*5472
+Klaipėda;Debreceno g.;20;5;179
+Klaipėda;Debreceno g.;20;7;
+Klaipėda;Debreceno g.;18;2;99*7026
+Klaipėda;Debreceno g.;18;1;99*7026
+Klaipėda;Debreceno g.;16;1;167*0291
+Klaipėda;Debreceno g.;16;4;167*0291
+Klaipėda;Debreceno g.;16;2;246
+Klaipėda;Debreceno g.;16;3;349
+Klaipėda;Debreceno g.;14;5;210*6139
+Klaipėda;Debreceno g.;14;6;67 (38)
+Klaipėda;Debreceno g.;14;2;150
+Klaipėda;Debreceno g.;14;1;357
+Klaipėda;Debreceno g.;14;3;148
+Klaipėda;Debreceno g.;14;4;130
+Klaipėda;Debreceno g.;6;2;81*3794
+Klaipėda;Debreceno g.;6;1;81*3794
+Natkiškių k.;Daubarų k.;8;2;
+Natkiškių k.;Daubarų k.;8;1;
+Klaipėda;Daržų g.;13;1;30*7179
+Klaipėda;Daržų g.;13;2;
+Klaipėda;Daržų g.;11;1;
+Klaipėda;Daržų g.;6;2;
+Klaipėda;Daržų g.;6;1;
+Klaipėda;Darželio g.;8;1;7*2707
+Klaipėda;Darželio g.;8;2;Rakinama
+Klaipėda;Darželio g.;8;3;150*5689
+Klaipėda;Darželio g.;8;4;150*5689
+Klaipėda;Darželio g.;6;5;raktas
+Klaipėda;Darželio g.;6;1;31*1111
+Klaipėda;Darželio g.;6;4;191*6885
+Klaipėda;Darželio g.;6;3;150*5689
+Klaipėda;Darželio g.;6;2;191*6885
+Klaipėda;Darželio g.;4;1;61*1234
+Klaipėda;Darželio g.;4;3;180*6202
+Klaipėda;Darželio g.;4;2;180*6202
+Klaipėda;Darželio g.;1;4;111*6885
+Klaipėda;Darželio g.;1;1;457
+Klaipėda;Darželio g.;1;2;268
+Klaipėda;Darželio g.;1;3;360
+Šilalė;Dariaus ir Girėno g.;63;1;nėra
+Šilalė;Dariaus ir Girėno g.;61;1;nėra
+Šilalė;Dariaus ir Girėno g.;59;1;
+Šilalė;Dariaus ir Girėno g.;57;1;38
+Šilalė;Dariaus ir Girėno g.;55;1;nėra
+Šilalė;Dariaus ir Girėno g.;53;1;
+Šilalė;Dariaus ir Girėno g.;51;1;
+Šilalė;Dariaus ir Girėno g.;49;1;
+Šilalė;Dariaus ir Girėno g.;47;1;
+Šilalė;Dariaus ir Girėno g.;46;1;
+Šilalė;Dariaus ir Girėno g.;45;1;
+Šilalė;Dariaus ir Girėno g.;44A;1;
+Šilalė;Dariaus ir Girėno g.;39;3;
+Šilalė;Dariaus ir Girėno g.;39;2;
+Šilalė;Dariaus ir Girėno g.;39;1;
+Šilalė;Dariaus ir Girėno g.;37;2;
+Šilalė;Dariaus ir Girėno g.;37;1;
+Šilalė;Dariaus ir Girėno g.;37;3;
+Šilalė;Dariaus ir Girėno g.;31;2;
+Šilalė;Dariaus ir Girėno g.;31;1;
+Šilalė;Dariaus ir Girėno g.;29;2;
+Šilalė;Dariaus ir Girėno g.;29;1;
+Žemaičių Naumiestis;Dariaus ir Girėno g.;28;1;
+Šilalė;Dariaus ir Girėno g.;27;1;38,antrų durų 12
+Šilutė;Dariaus ir Girėno g.;22;6;38
+Šilutė;Dariaus ir Girėno g.;22;3;38
+Šilutė;Dariaus ir Girėno g.;22;4;38
+Šilutė;Dariaus ir Girėno g.;22;2;NĖRA
+Šilutė;Dariaus ir Girėno g.;22;5;38
+Šilutė;Dariaus ir Girėno g.;22;1;38
+Žemaičių Naumiestis;Dariaus ir Girėno g.;21;1;
+Šilutė;Dariaus ir Girėno g.;20;1;0
+Šilutė;Dariaus ir Girėno g.;18b;1;
+Šilutė;Dariaus ir Girėno g.;18b;2;
+Šilutė;Dariaus ir Girėno g.;18A;1;38
+Šilutė;Dariaus ir Girėno g.;18A;2;38
+Šilutė;Dariaus ir Girėno g.;16;1;
+Klaipėda;Dariaus ir Girėno g.;11;1;359
+Šilalė;Dariaus ir Girėno g.;8;2;
+Šilalė;Dariaus ir Girėno g.;8;1;
+Klaipėda;Dariaus ir Girėno g.;7;1;raktas
+Šilutė;Dariaus ir Girėno g.;5A;1;126
+Šilutė;Dariaus ir Girėno g.;5A;2;
+Šilutė;Dariaus ir Girėno g.;5;2;38
+Šilutė;Dariaus ir Girėno g.;5;1;38
+Klaipėda;Dariaus ir Girėno g.;5;1;247
+Šilutė;Dariaus ir Girėno g.;4;1;
+Klaipėda;Dariaus ir Girėno g.;3;3;
+Klaipėda;Dariaus ir Girėno g.;3;1;459
+Klaipėda;Dariaus ir Girėno g.;3;2;459
+Šilutė;Dariaus ir Girėno g.;2;1;2580
+Šilalė;Dariaus ir Girėno g.;2;1;
+Šilalė;Dariaus ir Girėno g.;1;1;
+Klaipėda;Danės g.;39;2;120*3262
+Klaipėda;Danės g.;39;1;120*3262
+Klaipėda;Danės g.;39;3;120*3262
+Klaipėda;Danės g.;37;1;26
+Klaipėda;Danės g.;37;2;
+Klaipėda;Danės g.;35;2;248
+Klaipėda;Danės g.;35;1;8502#
+Klaipėda;Danės g.;35;4;
+Klaipėda;Danės g.;35;3;
+Klaipėda;Danės g.;33;2;12*3688
+Klaipėda;Danės g.;33;1;
+Klaipėda;Danės g.;31;7;
+Klaipėda;Danės g.;31;2;150*5689
+Klaipėda;Danės g.;31;3;120*3262
+Klaipėda;Danės g.;31;6;
+Klaipėda;Danės g.;31;1;150*5689
+Klaipėda;Danės g.;31;8;
+Klaipėda;Danės g.;31;5;
+Klaipėda;Danės g.;31;4;150*5689
+Klaipėda;Danės g.;27;1;
+Klaipėda;Danės g.;25;4;200*1234
+Klaipėda;Danės g.;25;8;
+Klaipėda;Danės g.;25;2;240
+Klaipėda;Danės g.;25;6;
+Klaipėda;Danės g.;25;1;136
+Klaipėda;Danės g.;25;5;
+Klaipėda;Danės g.;25;3;200*1234
+Klaipėda;Danės g.;25;7;
+Klaipėda;Danės g.;23;1;120*3262
+Klaipėda;Danės g.;23;3;raktas
+Klaipėda;Danės g.;23;2;120*3262
+Klaipėda;Danės g.;23;4;200*1234
+Klaipėda;Danės g.;23;8;
+Klaipėda;Danės g.;23;5;
+Klaipėda;Danės g.;23;6;
+Klaipėda;Danės g.;23;7;
+Klaipėda;Danės g.;23;9;
+Klaipėda;Danės g.;21;13;
+Klaipėda;Danės g.;21;11;
+Klaipėda;Danės g.;21;3;120*3262
+Klaipėda;Danės g.;21;8;
+Klaipėda;Danės g.;21;9;
+Klaipėda;Danės g.;21;7;
+Klaipėda;Danės g.;21;4;120*3262
+Klaipėda;Danės g.;21;12;
+Klaipėda;Danės g.;21;5;
+Klaipėda;Danės g.;21;1;120*3262
+Klaipėda;Danės g.;21;6;
+Klaipėda;Danės g.;21;10;
+Klaipėda;Danės g.;21;2;65*6952
+Šilalė;D. Poškos g.;20;1;
+Šilalė;D. Poškos g.;16;1;
+Šilalė;D. Poškos g.;12;2;
+Šilalė;D. Poškos g.;12;1;nėra
+Šilalė;D. Poškos g.;11;2;nėra
+Šilalė;D. Poškos g.;11;1;nėra
+Šilalė;D. Poškos g.;10;1;
+Šilalė;D. Poškos g.;10;3;23
+Šilalė;D. Poškos g.;10;2;
+Šilalė;D. Poškos g.;9;3;
+Šilalė;D. Poškos g.;9;2;38
+Šilalė;D. Poškos g.;9;1;38
+Šilalė;D. Poškos g.;8;2;
+Šilalė;D. Poškos g.;8;1;6
+Šilalė;D. Poškos g.;7;3;7
+Šilalė;D. Poškos g.;7;1;38
+Šilalė;D. Poškos g.;7;2;1
+Šilalė;D. Poškos g.;6;2;
+Šilalė;D. Poškos g.;6;3;38
+Šilalė;D. Poškos g.;6;1;3
+Šilalė;D. Poškos g.;4;1;41
+Šilalė;D. Poškos g.;4;2;42
+Sakūtėlių k.;Čiūtelių g.;9;1;
+Sakūtėlių k.;Čiūtelių g.;9;3;
+Sakūtėlių k.;Čiūtelių g.;9;2;
+Šilutė;Cintjoniškių g.;22;1;nėra
+Šilutė;Cintjoniškių g.;18;4;50
+Šilutė;Cintjoniškių g.;18;2;27
+Šilutė;Cintjoniškių g.;18;1;16
+Šilutė;Cintjoniškių g.;18;3;49
+Šilutė;Cintjoniškių g.;16;3;38
+Šilutė;Cintjoniškių g.;16;6;
+Šilutė;Cintjoniškių g.;16;2;
+Šilutė;Cintjoniškių g.;16;1;
+Šilutė;Cintjoniškių g.;16;5;
+Šilutė;Cintjoniškių g.;16;4;
+Šilutė;Cintjoniškių g.;10;2;
+Šilutė;Cintjoniškių g.;10;1;
+Šilutė;Cintjoniškių g.;9;4;16
+Šilutė;Cintjoniškių g.;9;1;Nėra
+Šilutė;Cintjoniškių g.;9;3;38
+Šilutė;Cintjoniškių g.;9;2;38
+Šilutė;Cintjoniškių g.;8;2;
+Šilutė;Cintjoniškių g.;8;1;nėra
+Šilutė;Cintjoniškių g.;7b;1;16
+Šilutė;Cintjoniškių g.;7b;2;38
+Šilutė;Cintjoniškių g.;7a;1;38
+Šilutė;Cintjoniškių g.;7a;2;38
+Šilutė;Cintjoniškių g.;7;2;Nėra
+Šilutė;Cintjoniškių g.;7;1;Nėra
+Šilutė;Cintjoniškių g.;5;2;25
+Šilutė;Cintjoniškių g.;5;1;15
+Šilutė;Cintjoniškių g.;2;1;nėra
+Šilutė;Cintjoniškių g.;2;2;nėra
+Klaipėda;Butsargių g.;15;1;
+Klaipėda;Butsargių g.;15;2;
+Klaipėda;Butsargių g.;13;1;38
+Klaipėda;Butsargių g.;11;1;
+Klaipėda;Butsargių g.;8;2;10/4361
+Klaipėda;Butsargių g.;8;1;10/4361
+Klaipėda;Butsargių g.;6;2;
+Klaipėda;Butsargių g.;6;1;
+Klaipėda;Butkų Juzės g.;7;1;raktas
+Klaipėda;Butkų Juzės g.;7;2;
+Klaipėda;Butkų Juzės g.;5;1;raktas
+Klaipėda;Butkų Juzės g.;4;1;120*3262
+Klaipėda;Butkų Juzės g.;4;2;120*3262
+Klaipėda;Butkų Juzės g.;3;1;raktas
+Klaipėda;Butkų Juzės g.;3;2;
+Jakų k.;;-;1;
+Bruzdeilyno k.;Bruzdeilyno g.;18;1;
+Palanga;Brukšvos g.;7;3;
+Palanga;Brukšvos g.;7;2;Raktai
+Palanga;Brukšvos g.;7;1;Raktas
+Stankiškių k.;Bložių g.;7;1;
+Bitėnų k.;Bitėnų g.;1;1;
+Sugintų k.;Birutės g.;31;1;
+Klaipėda;Birutės g.;22A-2P-G;2;
+Klaipėda;Birutės g.;22A-2P-G;1;
+Klaipėda;Birutės g.;22A;9;nėra
+Klaipėda;Birutės g.;22A;3;Magnetukas
+Klaipėda;Birutės g.;22A;15;nėra
+Klaipėda;Birutės g.;22A;2;Magnetukas
+Klaipėda;Birutės g.;22A;11;nėra
+Klaipėda;Birutės g.;22A;5;Magnetukas
+Klaipėda;Birutės g.;22A;8;Magnetukas
+Klaipėda;Birutės g.;22A;14;nėra
+Klaipėda;Birutės g.;22A;4;Magnetukas
+Klaipėda;Birutės g.;22A;13;nėra
+Klaipėda;Birutės g.;22A;10;nėra
+Klaipėda;Birutės g.;22A;6;Magnetukas
+Klaipėda;Birutės g.;22A;12;nėra
+Klaipėda;Birutės g.;22A;7;Magnetukas
+Klaipėda;Birutės g.;22A;16;nėra
+Klaipėda;Birutės g.;22A;1;Magnetukas
+Pagėgiai;Birutės g.;11;1;
+Pagėgiai;Birutės g.;10;1;
+Pagėgiai;Birutės g.;9;1;
+Pagėgiai;Birutės g.;8;1;
+Macikų k.;Beržų g.;13;1;
+Macikų k.;Beržų g.;11;1;
+Macikų k.;Beržų g.;11;2;
+Macikų k.;Beržų g.;9;1;
+Macikų k.;Beržų g.;9;2;
+Macikų k.;Beržų g.;8;2;
+Macikų k.;Beržų g.;8;4;
+Macikų k.;Beržų g.;8;3;
+Macikų k.;Beržų g.;8;1;
+Juknaičių k.;Beržų g.;6;1;
+Macikų k.;Beržų g.;4;1;
+Juknaičių k.;Beržų g.;4;1;
+Degučių k.;Beržų g.;1;1;nėra
+Degučių k.;Beržų g.;1;2;nėra
+Berštininkų k.;Berštininkų g.;8;1;
+Berštininkų k.;Berštininkų g.;3;1;
+Tauragė;Bendrabučio skg.;2;2;
+Tauragė;Bendrabučio skg.;2;1;
+Klaipėda;Bažnyčių g.;11;1;raktas
+Klaipėda;Bažnyčių g.;3;1;raktas
+Ropkojų k.;Bažnyčios g.;23;1;
+Balsiai;Bažnyčios g.;19;1;
+Balsiai;Bažnyčios g.;17;1;
+Ropkojų k.;Bažnyčios g.;14;1;
+Balsiai;Bažnyčios g.;11;1;
+Pajūralis;Bažnyčios g.;6;1;
+Klaipėda;Bangų g.;23;1;RAKINAMA
+Klaipėda;Bangų g.;21;2;Nėra
+Klaipėda;Bangų g.;21;3;Nėra
+Klaipėda;Bangų g.;21;1;012
+Klaipėda;Bangų g.;20;2;
+Klaipėda;Bangų g.;20;1;nerakinama
+Klaipėda;Bangų g.;19B;1;Nėra
+Klaipėda;Bangų g.;19B;2;Nėra
+Klaipėda;Bangų g.;19A;1;raktas
+Klaipėda;Bangų g.;19;2;Nėra
+Klaipėda;Bangų g.;19;1;
+Klaipėda;Bangų g.;17;1;61/1234
+Klaipėda;Bangų g.;17;2;Nėra
+Klaipėda;Bangų g.;15;1;27
+Klaipėda;Bangų g.;15;2;Nėra
+Klaipėda;Bangų g.;13;1;RAKINAMA
+Klaipėda;Bangų g.;11;1;RAKINAMA
+Klaipėda;Bangų g.;11;2;Nėra
+Klaipėda;Bangų g.;9;1;356
+Klaipėda;Bangų g.;9;2;Nėra
+Klaipėda;Bangų g.;6;1;RAKINAMA
+Klaipėda;Bangų g.;6;3;Nėra
+Klaipėda;Bangų g.;6;2;Nėra
+Klaipėda;Bangų g.;6;4;Nėra
+Klaipėda;Bangų g.;6;6;Nėra
+Klaipėda;Bangų g.;6;5;Nėra
+Palanga;Bangų g.;3A;1;magnetukas
+Klaipėda;Baltikalnio g.;9;2;150 * 5689
+Klaipėda;Baltikalnio g.;9;1;150 * 5689
+Klaipėda;Baltikalnio g.;8;2;Nėra
+Klaipėda;Baltikalnio g.;8;1;Nėra
+Klaipėda;Baltikalnio g.;7;2;Nėra
+Klaipėda;Baltikalnio g.;7;4;Nėra
+Klaipėda;Baltikalnio g.;7;1;159
+Klaipėda;Baltikalnio g.;7;3;Nėra
+Klaipėda;Baltikalnio g.;6;2;Nėra
+Klaipėda;Baltikalnio g.;6;1;450
+Klaipėda;Baltijos pr.;107;1;160*5615
+Klaipėda;Baltijos pr.;107;2;160*5615
+Klaipėda;Baltijos pr.;99;1;88*4377
+Klaipėda;Baltijos pr.;99;2;88*4377
+Klaipėda;Baltijos pr.;95;1;202*2761
+Klaipėda;Baltijos pr.;95;3;126
+Klaipėda;Baltijos pr.;95;4;46*8007
+Klaipėda;Baltijos pr.;95;2;202*2761
+Klaipėda;Baltijos pr.;93;2;167*0291
+Klaipėda;Baltijos pr.;93;1;C16
+Klaipėda;Baltijos pr.;91;6;167*0291
+Klaipėda;Baltijos pr.;91;2;167*0291
+Klaipėda;Baltijos pr.;91;5;167*0291
+Klaipėda;Baltijos pr.;91;4;167*0291
+Klaipėda;Baltijos pr.;91;3;167*0291
+Klaipėda;Baltijos pr.;91;1;167*0291
+Klaipėda;Baltijos pr.;87;2;97*4003
+Klaipėda;Baltijos pr.;87;1;97*4003
+Klaipėda;Baltijos pr.;83;1;246
+Klaipėda;Baltijos pr.;83;5;
+Klaipėda;Baltijos pr.;83;3;37
+Klaipėda;Baltijos pr.;83;4;91*5397
+Klaipėda;Baltijos pr.;83;2;28
+Klaipėda;Baltijos pr.;81;2;38
+Klaipėda;Baltijos pr.;81;3;47*2876
+Klaipėda;Baltijos pr.;81;6;97*4003
+Klaipėda;Baltijos pr.;81;5;97*4003
+Klaipėda;Baltijos pr.;81;4;269
+Klaipėda;Baltijos pr.;81;1;246
+Klaipėda;Baltijos pr.;79;2;147*0735
+Klaipėda;Baltijos pr.;79;1;36*6122
+Klaipėda;Baltijos pr.;69;5;119*1919
+Klaipėda;Baltijos pr.;69;3;240
+Klaipėda;Baltijos pr.;69;1;119*1919
+Klaipėda;Baltijos pr.;69;6;39
+Klaipėda;Baltijos pr.;69;4;350
+Klaipėda;Baltijos pr.;69;2;119*1919
+Klaipėda;Baltijos pr.;61;4;119*1919
+Klaipėda;Baltijos pr.;61;3;387
+Klaipėda;Baltijos pr.;61;2;249
+Klaipėda;Baltijos pr.;61;1;249
+Klaipėda;Baltijos pr.;59;3;567
+Klaipėda;Baltijos pr.;59;4;130*1597
+Klaipėda;Baltijos pr.;59;1;130*1597
+Klaipėda;Baltijos pr.;59;2;130*1597
+Klaipėda;Baltijos pr.;59;5;130*1597
+Klaipėda;Baltijos pr.;59;6;130*1597
+Klaipėda;Baltijos pr.;47;1;143*0371
+Klaipėda;Baltijos pr.;47;6;246
+Klaipėda;Baltijos pr.;47;3;143*0371
+Klaipėda;Baltijos pr.;47;2;143*0371
+Klaipėda;Baltijos pr.;47;5;143*0371
+Klaipėda;Baltijos pr.;47;4;38
+Klaipėda;Baltijos pr.;47;7;143*0371
+Klaipėda;Baltijos pr.;47;8;143*0371
+Klaipėda;Baltijos pr.;43;3;132*7738
+Klaipėda;Baltijos pr.;43;2;90r3723
+Klaipėda;Baltijos pr.;43;6;132*7738
+Klaipėda;Baltijos pr.;43;1;9r8986
+Klaipėda;Baltijos pr.;43;4;132*7738
+Klaipėda;Baltijos pr.;43;5;132*7738
+Klaipėda;Baltijos pr.;41;6;150*5689
+Klaipėda;Baltijos pr.;41;5;590
+Klaipėda;Baltijos pr.;41;2;90*2849
+Klaipėda;Baltijos pr.;41;1;358
+Klaipėda;Baltijos pr.;41;4;90*2849
+Klaipėda;Baltijos pr.;41;3;248
+Klaipėda;Baltijos pr.;37;1;*0013701
+Klaipėda;Baltijos pr.;37;4;55*9909
+Klaipėda;Baltijos pr.;37;3;55*9909
+Klaipėda;Baltijos pr.;37;2;55*9909
+Klaipėda;Baltijos pr.;35;6;99*9090
+Klaipėda;Baltijos pr.;35;2;35
+Klaipėda;Baltijos pr.;35;5;99*9090
+Klaipėda;Baltijos pr.;35;4;38
+Klaipėda;Baltijos pr.;35;3;38
+Klaipėda;Baltijos pr.;35;1;99*9090
+Klaipėda;Baltijos pr.;25;2;125*9328
+Klaipėda;Baltijos pr.;25;1;125*9328
+Klaipėda;Baltijos pr.;23;4;238
+Klaipėda;Baltijos pr.;23;3;239
+Klaipėda;Baltijos pr.;23;2;128
+Klaipėda;Baltijos pr.;23;1;119*1919
+Klaipėda;Baltijos pr.;11;1;170*3041
+Klaipėda;Baltijos pr.;11;2;170*3041
+Klaipėda;Baltijos pr.;9;2;130*1597
+Klaipėda;Baltijos pr.;9;4;130*1597
+Klaipėda;Baltijos pr.;9;3;137
+Klaipėda;Baltijos pr.;9;1;130*1597
+Klaipėda;Baltijos pr.;5;1;93*4032
+Klaipėda;Baltijos pr.;5;2;93*4032
+Jakų k.;Bajorų g.;24;1;
+Jakų k.;Bajorų g.;24;2;
+Bajėnų k.;Bajėnų k.;3;1;
+Katyčiai;Ąžuolo g.;4;1;
+Pagrynių k.;Aušros g.;23;1;nėra
+Pagrynių k.;Aušros g.;23;2;nėra
+Pagrynių k.;Aušros g.;18;2;nėra
+Pagrynių k.;Aušros g.;18;1;nėra
+Pagrynių k.;Aušros g.;15;1;0
+Rukų k.;Aušros g.;9;1;
+Rukų k.;Aušros g.;7;2;
+Rukų k.;Aušros g.;7;1;
+Rukų k.;Aušros g.;5;1;
+Rukų k.;Aušros g.;3;1;
+Iždonų k.;Aušrinės g.;19;1;
+Iždonų k.;Aušrinės g.;17;1;
+Šilutė;Aukštumalės g.;3;2;38
+Šilutė;Aukštumalės g.;3;1;38
+Šilutė;Aukštumalės g.;1;2;450
+Šilutė;Aukštumalės g.;1;1;1367
+Klaipėda;Aukštoji g.;13;2;Nėra
+Klaipėda;Aukštoji g.;13;1;raktas
+Klaipėda;Aukštoji g.;12;1;raktas
+Klaipėda;Aukštoji g.;11;1;Nėra
+Klaipėda;Aukštoji g.;11;2;Nėra
+Klaipėda;Aukštoji g.;10;1;Nėra
+Klaipėda;Aukštoji g.;10;3;Nėra
+Klaipėda;Aukštoji g.;10;2;Nėra
+Klaipėda;Aukštoji g.;9;2;Nėra
+Klaipėda;Aukštoji g.;9;1;raktas
+Klaipėda;Aukštoji g.;8;1;Nėra
+Klaipėda;Aukštoji g.;8;2;Nėra
+Klaipėda;Aukštoji g.;8;3;Nėra
+Klaipėda;Aukštoji g.;7;1;raktas
+Klaipėda;Aukštoji g.;5;1;
+Klaipėda;Aukštoji g.;5;2;nėra
+Klaipėda;Aukštoji g.;4;2;
+Klaipėda;Aukštoji g.;4;1;raktas
+Naujasis Obelynas;Atgimimo g.;3;1;
+Pajūris;Ateities g.;7;1;
+Pajūris;Ateities g.;5;1;
+Trakininkų k.;Ateities g.;3;1;
+Pajūris;Ateities g.;3;1;
+Inkaklių k.;Ašvos g.;16;1;
+Pajūralis;Ašvos g.;8;1;
+Pajūralis;Ašvos g.;4;1;
+Pajūralis;Ašvos g.;1;1;
+Pajūralis;Ašvos g.;1;2;
+Palanga;Ašaralio g.;4;1;77*2121
+Palanga;Ašaralio g.;2;1;104*1212
+Apvaršuva;Apvaršuva;12;1;
+Stumbragirių k.;Anužių k.;1;1;
+Vainutas;Antano Baranausko g.;40;1;nėra
+Klaipėda;Alksnynės g.;21;1;130*6676
+Klaipėda;Alksnynės g.;21;3;130*6676
+Klaipėda;Alksnynės g.;21;2;130*6676
+Klaipėda;Alksnynės g.;15B;3;200*0752
+Klaipėda;Alksnynės g.;15B;2;200*0752
+Klaipėda;Alksnynės g.;15B;1;200*0752
+Klaipėda;Alksnynės g.;15A;2;200*0752
+Klaipėda;Alksnynės g.;15A;1;200*0752
+Klaipėda;Alksnynės g.;15A;3;126
+Klaipėda;Alksnynės g.;15;1;200*0752
+Klaipėda;Alksnynės g.;15;3;200*0752
+Klaipėda;Alksnynės g.;15;2;16*3937
+Klaipėda;Alksnynės g.;9;1;111*5377
+Klaipėda;Alksnynės g.;8;1;145*2175
+Klaipėda;Alksnynės g.;8;2;145*2175
+Klaipėda;Alksnynės g.;8;3;145*2175
+Klaipėda;Alksnynės g.;7;1;130*0377
+Klaipėda;Alksnynės g.;6A;2;359
+Klaipėda;Alksnynės g.;6A;1;119*1919
+Klaipėda;Alksnynės g.;6A;3;119*1919
+Klaipėda;Alksnynės g.;6;3;248
+Klaipėda;Alksnynės g.;6;2;119*0409
+Klaipėda;Alksnynės g.;6;1;119*0409
+Klaipėda;Alksnynės g.;5B;2;0828#
+Klaipėda;Alksnynės g.;5B;3;150*3499
+Klaipėda;Alksnynės g.;5B;1;3345#
+Klaipėda;Alksnynės g.;5A;3;59
+Klaipėda;Alksnynės g.;5A;1;150*3499
+Klaipėda;Alksnynės g.;5A;2;150*3499
+Klaipėda;Alksnynės g.;5;3;230
+Klaipėda;Alksnynės g.;5;1;150*3488
+Klaipėda;Alksnynės g.;5;2;49
+Klaipėda;Alksnynės g.;4A;2;61*1234
+Klaipėda;Alksnynės g.;4A;3;61*1234
+Klaipėda;Alksnynės g.;4A;1;17*9483,16*4227
+Klaipėda;Alksnynės g.;4;3;195*4608
+Klaipėda;Alksnynės g.;4;2;195*4608
+Klaipėda;Alksnynės g.;4;1;195*4608
+Klaipėda;Alksnynės g.;3;1;*1001000
+Žadeikių k.;Alkos g.;4;1;
+Pagrynių k.;Alyvų g.;15;1;
+Mažaičių k.;Aleknų kel.;2;1;
+Mažaičių k.;Aleknų kel.;2;2;
+Aleknų k.;Aleknų k.;8;1;
+Aleknų k.;Aleknų k.;3A;1;
+Stumbragirių k.;Aleknų k.;1;1;
+Gineikių km.;Akmenos g.;37;2;
+Gineikių km.;Akmenos g.;37;1;
+Gineikių km.;Akmenos g.;33;1;nėra
+Gineikių km.;Akmenos g.;31;1;nėra
+Biržų Laukas;Akmenos g.;7;1;nėra
+Biržų Laukas;Akmenos g.;5;2;
+Biržų Laukas;Akmenos g.;5;1;
+Šilutė;Ajerų g.;34;1;
+Šilutė;Ajerų g.;27;1;
+Aisėnų k.;Aisės g.;12;1;
+Aisėnų k.;Aisės g.;12;2;
+Aisėnų k.;Aisės g.;2;1;
+Klaipėda;Aguonų g.;6;1;
+Klaipėda;Aguonų g.;4;1;
+`;
+
+  // Data shape: { city, street, house, stair, code }
+  let entries = [];
+  let streetAll = [];
+  let houseAll = [];
+
+  const el = (id) => document.getElementById(id);
+
+  function normalize(s){
+    return String(s ?? "")
+      .replace(/\ufeff/g, "")     // BOM
+      .replace(/\u00A0/g, " ")    // NBSP
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
+  // Tolerant CSV parser: supports ; or , delimiter. Assumes no quoted delimiters inside fields.
+  function parseCSV(text){
+    const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+    if (!lines.length) return [];
+
+    // detect delimiter
+    const sample = lines[0];
+    const delim = (sample.split(";").length >= sample.split(",").length) ? ";" : ",";
+
+    const rows = lines.map(line => line.split(delim).map(v => normalize(v)));
+
+    // drop header if present
+    const header = rows[0].join("|").toLowerCase();
+    const hasHeader = header.includes("miestas") && header.includes("gatv");
+    const dataRows = hasHeader ? rows.slice(1) : rows;
+
+    return dataRows
+      .filter(r => r.length >= 4)
+      .map(r => ({
+        city: r[0] ?? "",
+        street: r[1] ?? "",
+        house: r[2] ?? "",
+        stair: r[3] ?? "",
+        code: r[4] ?? ""
+      }))
+      .filter(x => x.city && x.street && x.house && x.stair);
+  }
+
+  function fillSelect(selectEl, options, placeholder){
+    selectEl.innerHTML = "";
+
+    const ph = document.createElement("option");
+    ph.value = "";
+    ph.textContent = placeholder;
+    selectEl.appendChild(ph);
+
+    for (const opt of options){
+      const o = document.createElement("option");
+      o.value = opt;
+      o.textContent = opt;
+      selectEl.appendChild(o);
+    }
+    selectEl.value = "";
+  }
+
+  function resetDownstream(from){
+    if (from === "city"){
+      el("streetSearch").value = "";
+      el("houseSearch").value = "";
+      fillSelect(el("street"), [], "Pasirink gatvę...");
+      fillSelect(el("house"), [], "Pasirink namą...");
+      el("result").style.display = "none";
+    }
+    if (from === "street"){
+      el("houseSearch").value = "";
+      fillSelect(el("house"), [], "Pasirink namą...");
+      el("result").style.display = "none";
+    }
+    if (from === "house"){
+      el("result").style.display = "none";
+    }
+  }
+
+  function refreshCities(){
+    const priority = ["Klaipėda", "Šilutė", "Tauragė", "Šilalė"];
+    const all = [...new Set(entries.map(e => e.city))];
+
+    const top = priority.filter(p => all.includes(p));
+    const rest = all
+      .filter(c => !priority.includes(c))
+      .sort((a,b)=>a.localeCompare(b,"lt"));
+
+    const cities = [...top, ...rest];
+    fillSelect(el("city"), cities, "Pasirink miestą...");
+  }
+
+  function refreshStreets(){
+    const city = el("city").value;
+    const list = entries.filter(e => e.city === city).map(e => e.street);
+    streetAll = [...new Set(list)].sort((a,b)=>a.localeCompare(b,"lt"));
+    applyStreetFilter();
+  }
+
+  function applyStreetFilter(){
+    const q = normalize(el("streetSearch").value).toLowerCase();
+    const filtered = q ? streetAll.filter(s => s.toLowerCase().includes(q)) : streetAll;
+    fillSelect(el("street"), filtered, "Pasirink gatvę...");
+  }
+
+  function refreshHouses(){
+    const city = el("city").value;
+    const street = el("street").value;
+    const list = entries
+      .filter(e => e.city === city && e.street === street)
+      .map(e => e.house);
+    houseAll = [...new Set(list)].sort((a,b)=>a.localeCompare(b,"lt",{numeric:true}));
+    applyHouseFilter();
+  }
+
+  function applyHouseFilter(){
+    const q = normalize(el("houseSearch").value).toLowerCase();
+    const filtered = q ? houseAll.filter(s => s.toLowerCase().includes(q)) : houseAll;
+    fillSelect(el("house"), filtered, "Pasirink namą...");
+  }
+
+  function showResult(){
+    const city = el("city").value;
+    const street = el("street").value;
+    const house = el("house").value;
+
+    const matches = entries
+      .filter(e => e.city === city && e.street === street && e.house === house)
+      .sort((a,b)=>String(a.stair).localeCompare(String(b.stair), "lt", {numeric:true}));
+
+    el("resultTitle").textContent = `${city} • ${street} ${house}`;
+    el("stairs").innerHTML = "";
+    el("noCode").style.display = matches.length ? "none" : "block";
+
+    for (const m of matches){
+      const wrap = document.createElement("div");
+      wrap.className = "pill";
+
+      const left = document.createElement("div");
+      left.innerHTML = `
+        <div><b>Laiptinė:</b> ${m.stair}</div>
+        <div class="code">${m.code ? m.code : "<span class='muted'>Nėra</span>"}</div>
+      `;
+
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.textContent = "Kopijuoti";
+      btn.onclick = async () => {
+        const text = m.code || "";
+        try{
+          await navigator.clipboard.writeText(text);
+          btn.textContent = "Nukopijuota ✓";
+          setTimeout(()=>btn.textContent="Kopijuoti", 900);
+        }catch{
+          prompt("Nukopijuok ranka:", text);
+        }
+      };
+
+      wrap.appendChild(left);
+      wrap.appendChild(btn);
+      el("stairs").appendChild(wrap);
+    }
+
+    el("countInfo").textContent = `Įrašų: ${entries.length}`;
+    el("result").style.display = "block";
+  }
+
+  function afterLoad(){
+    el("filters").style.display = "block";
+    el("result").style.display = "none";
+    resetDownstream("city");
+    refreshCities();
+    el("countInfo").textContent = `Įrašų: ${entries.length}`;
+  }
+
+  // Auto-load on open
+  entries = parseCSV(EMBEDDED_CSV);
+  afterLoad();
+
+  // Events
+  el("city").addEventListener("change", () => {
+    resetDownstream("city");
+    if (!el("city").value) return;
+    refreshStreets();
+  });
+
+  el("streetSearch").addEventListener("input", () => {
+    if (!entries.length) return;
+    applyStreetFilter();
+  });
+
+  el("street").addEventListener("change", () => {
+    resetDownstream("street");
+    if (!el("street").value) return;
+    refreshHouses();
+  });
+
+  el("houseSearch").addEventListener("input", () => {
+    if (!entries.length) return;
+    applyHouseFilter();
+  });
+
+  el("house").addEventListener("change", () => {
+    resetDownstream("house");
+    if (!el("house").value) return;
+    showResult();
+  });
+</script>
+
+</body>
+</html>
